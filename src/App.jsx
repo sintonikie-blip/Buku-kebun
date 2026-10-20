@@ -94,6 +94,7 @@ function Pendapatan({ uid, tarif }) {
   const del = (x) => confirm(`Yakin hapus panen tanggal ${x.tanggal}? Data dipindah ke Sampah.`) && updateDoc(ref(x.id), { dihapus: true, terakhirDiedit: Date.now() });
   const lunas = (x) => updateDoc(ref(x.id), { lunas: !x.lunas, tanggalLunas: x.lunas ? "" : today() });
   return (<>
+    <button className="add" onClick={() => setForm({})}>+ Panen Baru</button>
     <div className="bar"><input placeholder="Cari pembeli / tanggal" value={q} onChange={(e) => setQ(e.target.value)} />
       <input type="month" value={bln} onChange={(e) => setBln(e.target.value)} style={{ flex: "0 0 150px" }} /></div>
     <div className="chips">
@@ -113,7 +114,6 @@ function Pendapatan({ uid, tarif }) {
           <Menu trash={!!x.dihapus} onView={() => setView(x)} onEdit={() => setForm(x)} onDel={() => del(x)}
             onRestore={() => updateDoc(ref(x.id), { dihapus: false })} /></div></div>))}
     </div>
-    <button className="fab" onClick={() => setForm({})}>+ Panen</button>
     <div className="sum"><div>
       <span>{s.n ? `${s.n} dipilih` : "Semua yang tampil"} ({s.rows.length} panen)</span><span>{kg(sum("kotor"))} kotor / {kg(sum("bersih"))} bersih</span>
       <span>Pendapatan</span><b>{rp(sum("total"))}</b>
@@ -183,6 +183,7 @@ function Biaya({ uid }) {
   const total = s.rows.reduce((a, x) => a + N(x.nominal), 0);
   const del = (x) => confirm(`Yakin hapus biaya "${x.keterangan}"?`) && updateDoc(ref(x.id), { dihapus: true, terakhirDiedit: Date.now() });
   return (<>
+    <button className="add" onClick={() => setForm({})}>+ Biaya Baru</button>
     <div className="bar"><input placeholder="Cari keterangan (mis. pupuk)" value={q} onChange={(e) => setQ(e.target.value)} />
       <input type="month" value={bln} onChange={(e) => setBln(e.target.value)} style={{ flex: "0 0 150px" }} /></div>
     <div className="chips"><button className={!trash ? "on" : ""} onClick={() => setTrash(false)}>Aktif</button>
@@ -195,7 +196,6 @@ function Biaya({ uid }) {
           <div className="r2">{x.keterangan}</div></div>
         <Menu trash={trash} onView={() => setView(x)} onEdit={() => setForm(x)} onDel={() => del(x)} onRestore={() => updateDoc(ref(x.id), { dihapus: false })} />
       </div>))}</div>
-    <button className="fab" onClick={() => setForm({})}>+ Biaya</button>
     <div className="sum"><div><span>{s.n ? `${s.n} dipilih` : "Grand total"} ({s.rows.length} biaya)</span><span className="u">{rp(total)}</span></div></div>
     {form && <BForm init={form} uid={uid} close={() => setForm(null)} />}
     {view && <Sheet close={() => setView(null)}><h3>Biaya {view.tanggal}</h3><div className="dl">
