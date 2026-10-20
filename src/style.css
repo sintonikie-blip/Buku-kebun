@@ -21,7 +21,7 @@ button,input,select{font:inherit;color:inherit}
 .sum{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:2px solid var(--g);padding:10px 14px}
 .sum div{max-width:720px;margin:0 auto;display:grid;grid-template-columns:1fr auto;gap:2px 10px;font-size:14px}
 .sum .u{font-size:18px;font-weight:700;color:var(--g)}
-.fab{position:fixed;right:14px;bottom:170px;z-index:6;background:var(--a);color:#fff;border:0;border-radius:99px;padding:12px 18px;font-weight:700;box-shadow:0 3px 10px #0004}
+.add{width:100%;padding:13px;margin-bottom:10px;background:var(--a);color:#fff;border:0;border-radius:10px;font-weight:700;font-size:16px}
 .modal{position:fixed;inset:0;background:#0007;z-index:20;display:flex;align-items:flex-end;justify-content:center}
 .sheet{background:var(--bg);width:100%;max-width:560px;max-height:92vh;overflow:auto;border-radius:16px 16px 0 0;padding:16px}
 .f{display:grid;grid-template-columns:1fr 1fr;gap:10px}.f label{display:grid;gap:4px;font-size:14px;color:var(--mute)}
