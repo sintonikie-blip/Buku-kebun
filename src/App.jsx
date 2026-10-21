@@ -91,7 +91,7 @@ function useSel(list) {
 
 function Pendapatan({ uid, tarif }) {
   const items = useCol(uid, "pendapatan");
-  const [q, setQ] = useState(""), [bln, setBln] = useState(""), [st, setSt] = useState("semua");
+  const [q, setQ] = useState(""), [bln, setBln] = useState(today().slice(0, 7)), [st, setSt] = useState("semua");
   const [form, setForm] = useState(null), [view, setView] = useState(null);
   const ref = (id) => doc(db, "users", uid, "pendapatan", id);
   const list = useMemo(() => items.filter((x) => !!x.dihapus === (st === "sampah")
@@ -110,7 +110,7 @@ function Pendapatan({ uid, tarif }) {
     <div className="chips">
       {[["semua", "Semua"], ["belum", "Belum lunas"], ["lunas", "Sudah lunas"], ["sampah", "Sampah"]].map(([k, l]) =>
         <button key={k} className={st === k ? "on" : ""} onClick={() => setSt(k)}>{l}</button>)}
-      <button onClick={s.all}>Pilih semua</button></div>
+      <button onClick={() => setBln(bln ? "" : today().slice(0, 7))}>{bln ? "Semua bulan" : "Bulan ini"}</button><button onClick={s.all}>Pilih semua</button></div>
     <div className="list">
       {!list.length && <div className="empty">Belum ada data. Ketuk “+ Panen” untuk mulai.</div>}
       {list.map((x) => (<div className="row" key={x.id}>
@@ -184,7 +184,7 @@ function PForm({ init, tarif, uid, close, names }) {
 
 function Biaya({ uid }) {
   const items = useCol(uid, "biayaLain");
-  const [q, setQ] = useState(""), [bln, setBln] = useState(""), [trash, setTrash] = useState(false);
+  const [q, setQ] = useState(""), [bln, setBln] = useState(today().slice(0, 7)), [trash, setTrash] = useState(false);
   const [form, setForm] = useState(null), [view, setView] = useState(null);
   const ref = (id) => doc(db, "users", uid, "biayaLain", id);
   const list = useMemo(() => items.filter((x) => !!x.dihapus === trash && (!bln || x.tanggal.startsWith(bln))
@@ -197,7 +197,7 @@ function Biaya({ uid }) {
     <div className="bar"><input placeholder="Cari keterangan (mis. pupuk)" value={q} onChange={(e) => setQ(e.target.value)} />
       <input type="month" value={bln} onChange={(e) => setBln(e.target.value)} style={{ flex: "0 0 150px" }} /></div>
     <div className="chips"><button className={!trash ? "on" : ""} onClick={() => setTrash(false)}>Aktif</button>
-      <button className={trash ? "on" : ""} onClick={() => setTrash(true)}>Sampah</button><button onClick={s.all}>Pilih semua</button></div>
+      <button className={trash ? "on" : ""} onClick={() => setTrash(true)}>Sampah</button><button onClick={() => setBln(bln ? "" : today().slice(0, 7))}>{bln ? "Semua bulan" : "Bulan ini"}</button><button onClick={s.all}>Pilih semua</button></div>
     <div className="list two">
       {!list.length && <div className="empty">Belum ada biaya.</div>}
       {list.map((x) => (<div className="row" key={x.id}>
