@@ -40,3 +40,4 @@ button,input,select{font:inherit;color:inherit}
 .login input,.login button{padding:12px;border-radius:8px;border:1px solid var(--ln);background:var(--card)}
 .login button{background:var(--g);color:var(--bg);font-weight:700}.err{color:var(--red);font-size:14px}
 .empty{text-align:center;color:var(--mute);padding:30px}.dl{display:grid;grid-template-columns:1fr auto;gap:6px 10px}
+.wa{width:100%;padding:12px;margin-bottom:10px;background:#1f9d55;color:#fff;border:0;border-radius:10px;font-weight:700;font-size:15px}
