@@ -7,6 +7,7 @@ const rp = (n) => "Rp" + Math.round(n || 0).toLocaleString("id-ID");
 const kg = (n) => (Number(n) || 0).toLocaleString("id-ID") + " kg";
 const N = (v) => Number(v) || 0;
 const today = () => new Date(Date.now() - new Date().getTimezoneOffset() * 6e4).toISOString().slice(0, 10);
+const TABS = [["pendapatan", "🌴", "Panen"], ["biaya", "🧾", "Biaya"], ["rekap", "📊", "Rekap"], ["set", "⚙️", "Atur"]];
 const DEF = { angkut: 190, panen: 250, fee: 15 };
 
 // Semua hitungan pakai tarif yang tersimpan di transaksi; ongkos manual tidak ditimpa
@@ -34,15 +35,17 @@ export default function App() {
   if (user === undefined) return <div className="empty">Memuat…</div>;
   if (!user) return <Login />;
   return (<>
-    <nav className="top">
-      {[["pendapatan", "Pendapatan"], ["biaya", "Biaya Lain"], ["set", "Pengaturan"]].map(([k, l]) =>
-        <button key={k} className={tab === k ? "on" : ""} onClick={() => setTab(k)}>{l}</button>)}
-    </nav>
+    <header className="hd">Buku Kebun</header>
     <div className="wrap">
       {tab === "pendapatan" && <Pendapatan uid={user.uid} tarif={tarif} />}
       {tab === "biaya" && <Biaya uid={user.uid} />}
+      {tab === "rekap" && <Rekap uid={user.uid} />}
       {tab === "set" && <Pengaturan uid={user.uid} tarif={tarif} />}
     </div>
+    <nav className="tabs">
+      {TABS.map(([k, ic, l]) => <button key={k} className={tab === k ? "on" : ""} onClick={() => setTab(k)}>
+        <span className="ti">{ic}</span><span>{l}</span></button>)}
+    </nav>
   </>);
 }
 
@@ -230,4 +233,52 @@ function Pengaturan({ uid, tarif }) {
     <p className="r2">Data panen lama tidak ikut berubah; tiap panen menyimpan tarifnya sendiri.</p>
     <div className="btns"><button className="pri" onClick={save}>Simpan tarif</button></div>
     <div className="btns"><button className="del" onClick={() => signOut(auth)}>Keluar (logout)</button></div></>);
+}
+
+const BULAN = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+const shift = (m, d) => { const [y, mo] = m.split("-").map(Number); const t = new Date(y, mo - 1 + d, 1); return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}`; };
+const lbl = (m) => BULAN[Number(m.split("-")[1]) - 1] + " " + m.split("-")[0];
+
+function Rekap({ uid }) {
+  const pend = useCol(uid, "pendapatan"), biaya = useCol(uid, "biayaLain");
+  const [m, setM] = useState(today().slice(0, 7));
+  const stat = (mm) => {
+    const p = pend.filter((x) => !x.dihapus && x.tanggal.startsWith(mm));
+    const b = biaya.filter((x) => !x.dihapus && x.tanggal.startsWith(mm));
+    const sum = (a, k) => a.reduce((t, x) => t + N(x[k]), 0);
+    const tipe = (t) => { const r = p.filter((x) => x.tipe === t); const bersih = sum(r, "bersih"), total = sum(r, "total"); return { n: r.length, bersih, total, avg: bersih ? total / bersih : 0 }; };
+    const untung = sum(p, "untung"), biayaLain = sum(b, "nominal");
+    const bl = p.filter((x) => !x.lunas);
+    return { n: p.length, ada: p.length + b.length, kotor: sum(p, "kotor"), bersih: sum(p, "bersih"), total: sum(p, "total"),
+      angkut: sum(p, "ongkosAngkut"), panen: sum(p, "ongkosPanen"), fee: sum(p, "fee"), untung, biayaLain, laba: untung - biayaLain,
+      lunas: p.length - bl.length, belum: bl.length, belumRp: sum(bl, "untung"), BB: tipe("BB"), BK: tipe("BK") };
+  };
+  const s = stat(m), prev = stat(shift(m, -1));
+  const diff = prev.ada && prev.laba ? ((s.laba - prev.laba) / Math.abs(prev.laba)) * 100 : null;
+  const series = [5, 4, 3, 2, 1, 0].map((i) => { const mm = shift(m, -i); return { mm, laba: stat(mm).laba }; });
+  const max = Math.max(1, ...series.map((x) => Math.abs(x.laba)));
+  const row = (l, v, b) => <><span className={b ? "big" : ""}>{l}</span><span className={b ? "big" : ""}>{v}</span></>;
+  return (<>
+    <div className="mn"><button className="ic" onClick={() => setM(shift(m, -1))}>◀</button>
+      <b>{lbl(m)}</b><button className="ic" onClick={() => setM(shift(m, 1))}>▶</button></div>
+    <div className="card hero"><div className="r2">Laba akhir bulan</div>
+      <div className={"hl " + (s.laba < 0 ? "neg" : "ok")}>{rp(s.laba)}</div>
+      <div className="r2">{diff === null ? "Belum ada pembanding bulan lalu" :
+        `${diff >= 0 ? "▲ naik" : "▼ turun"} ${Math.abs(diff).toFixed(0)}% dari ${lbl(shift(m, -1))} (${rp(prev.laba)})`}</div></div>
+    <div className="card"><h4>Panen</h4><div className="dl">
+      {row("Jumlah panen", s.n + "x")}{row("Berat kotor", kg(s.kotor))}{row("Berat bersih", kg(s.bersih))}</div></div>
+    <div className="card"><h4>Per tipe buah</h4><div className="dl">
+      {["BB", "BK"].map((t) => <>{row(t === "BB" ? "Buah Besar (BB)" : "Buah Kecil (BK)", rp(s[t].total))}
+        <span className="r2">{s[t].n}x · {kg(s[t].bersih)}</span><span className="r2">rata-rata {rp(s[t].avg)}/kg</span></>)}</div></div>
+    <div className="card"><h4>Hitungan</h4><div className="dl">
+      {row("Pendapatan", rp(s.total), 1)}{row("Ongkos angkut", "− " + rp(s.angkut))}{row("Ongkos panen", "− " + rp(s.panen))}
+      {row("Fee Acut", "− " + rp(s.fee))}{row("Untung bersih panen", rp(s.untung), 1)}
+      {row("Biaya lain", "− " + rp(s.biayaLain))}{row("Laba akhir bulan", rp(s.laba), 1)}</div></div>
+    <div className="card"><h4>Status lunas</h4><div className="dl">
+      {row("Sudah lunas", s.lunas + " panen")}{row("Belum lunas", s.belum + " panen")}{row("Untung belum lunas", rp(s.belumRp))}</div></div>
+    <div className="card"><h4>Laba 6 bulan terakhir</h4>
+      {series.map((x) => <div className="b" key={x.mm}><span>{BULAN[Number(x.mm.split("-")[1]) - 1].slice(0, 3)} {x.mm.slice(2, 4)}</span>
+        <div className="track"><div className={"fill" + (x.laba < 0 ? " neg" : "")} style={{ width: (Math.abs(x.laba) / max) * 100 + "%" }} /></div>
+        <span>{rp(x.laba)}</span></div>)}</div>
+  </>);
 }
