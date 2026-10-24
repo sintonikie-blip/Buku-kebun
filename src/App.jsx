@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { onAuthStateChanged, signInWithEmailAndPassword, signOut } from "firebase/auth";
-import { collection, doc, onSnapshot, addDoc, updateDoc, setDoc } from "firebase/firestore";
+import { collection, doc, onSnapshot, addDoc, updateDoc, setDoc, deleteDoc } from "firebase/firestore";
 import { auth, db } from "./firebase";
 
 const rp = (n) => "Rp" + Math.round(n || 0).toLocaleString("id-ID");
@@ -13,6 +13,13 @@ async function saveFile(name, text, type) {
   try { if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: name }); return; } }
   catch (e) { if (e.name === "AbortError") return; }
   const a = document.createElement("a"); a.href = URL.createObjectURL(file); a.download = name; document.body.appendChild(a); a.click(); a.remove();
+}
+const pendCsv = (a) => csv([["Tanggal", "Tipe", "Berat kotor", "Berat bersih", "Harga", "Total", "Pembeli", "Ongkos angkut", "Ongkos panen", "Fee Acut", "Untung bersih", "Lunas", "Tanggal lunas"],
+  ...[...a].sort((x, y) => x.tanggal.localeCompare(y.tanggal)).map((x) => [x.tanggal, x.tipe, x.kotor, x.bersih, x.harga, x.total, x.pembeli, x.ongkosAngkut, x.ongkosPanen, x.fee, x.untung, x.lunas ? "Ya" : "Belum", x.tanggalLunas])]);
+const biayaCsv = (a) => csv([["Tanggal", "Keterangan", "Nominal"], ...[...a].sort((x, y) => x.tanggal.localeCompare(y.tanggal)).map((x) => [x.tanggal, x.keterangan, x.nominal])]);
+function MonthSelect({ items, value, onChange }) {
+  const ms = [...new Set([today().slice(0, 7), ...items.filter((x) => !x.dihapus).map((x) => x.tanggal.slice(0, 7))])].sort().reverse();
+  return <select value={value} onChange={(e) => onChange(e.target.value)}><option value="">Semua bulan</option>{ms.map((m) => <option key={m} value={m}>{lbl(m)}</option>)}</select>;
 }
 const TABS = [["pendapatan", "🌴", "Panen"], ["biaya", "🧾", "Biaya"], ["rekap", "📊", "Rekap"], ["set", "⚙️", "Atur"]];
 const DEF = { angkut: 190, panen: 250, fee: 15 };
@@ -65,16 +72,15 @@ function Login() {
     {err && <div className="err">{err}</div>}<button onClick={go}>Masuk</button></div>);
 }
 
-function Menu({ onView, onEdit, onDel, trash, onRestore }) {
+function Menu({ onView, onEdit, onDel }) {
   const [o, setO] = useState(false);
   const pick = (f) => () => { setO(false); f(); };
   return (<span style={{ position: "relative" }}>
     <button className="ic" aria-label="Menu" onClick={() => setO(!o)}>⋮</button>
     {o && <div className="dd">
-      {trash ? <button onClick={pick(onRestore)}>♻️ Pulihkan</button> : <>
-        <button onClick={pick(onView)}>👁️ Lihat</button>
-        <button onClick={pick(onEdit)}>✏️ Edit</button>
-        <button onClick={pick(onDel)}>🗑️ Hapus</button></>}
+      <button onClick={pick(onView)}>👁️ Lihat</button>
+      <button onClick={pick(onEdit)}>✏️ Edit</button>
+      <button onClick={pick(onDel)}>🗑️ Hapus</button>
     </div>}</span>);
 }
 
@@ -94,23 +100,23 @@ function Pendapatan({ uid, tarif }) {
   const [q, setQ] = useState(""), [bln, setBln] = useState(today().slice(0, 7)), [st, setSt] = useState("semua");
   const [form, setForm] = useState(null), [view, setView] = useState(null);
   const ref = (id) => doc(db, "users", uid, "pendapatan", id);
-  const list = useMemo(() => items.filter((x) => !!x.dihapus === (st === "sampah")
+  const list = useMemo(() => items.filter((x) => !x.dihapus
     && (!bln || x.tanggal.startsWith(bln))
-    && (st === "semua" || st === "sampah" || (st === "lunas") === !!x.lunas)
+    && (st === "semua" || (st === "lunas") === !!x.lunas)
     && (!q || (x.pembeli || "").toLowerCase().includes(q.toLowerCase()) || x.tanggal.includes(q))), [items, q, bln, st]);
   const s = useSel(list);
   const sum = (k) => s.rows.reduce((a, x) => a + N(x[k]), 0);
   const belum = s.rows.filter((x) => !x.lunas).reduce((a, x) => a + N(x.untung), 0);
-  const del = (x) => confirm(`Yakin hapus panen tanggal ${x.tanggal}? Data dipindah ke Sampah.`) && updateDoc(ref(x.id), { dihapus: true, terakhirDiedit: Date.now() });
+  const del = (x) => confirm(`Hapus permanen panen tanggal ${x.tanggal}? Tidak bisa dibatalkan.`) && deleteDoc(ref(x.id));
+  const exp = () => saveFile(`pendapatan-${bln || "semua"}.csv`, pendCsv(list), "text/csv");
   const lunas = (x) => updateDoc(ref(x.id), { lunas: !x.lunas, tanggalLunas: x.lunas ? "" : today() });
   return (<>
     <button className="add" onClick={() => setForm({})}>+ Panen Baru</button>
-    <div className="bar"><input placeholder="Cari pembeli / tanggal" value={q} onChange={(e) => setQ(e.target.value)} />
-      <input type="month" value={bln} onChange={(e) => setBln(e.target.value)} style={{ flex: "0 0 150px" }} /></div>
-    <div className="chips">
-      {[["semua", "Semua"], ["belum", "Belum lunas"], ["lunas", "Sudah lunas"], ["sampah", "Sampah"]].map(([k, l]) =>
-        <button key={k} className={st === k ? "on" : ""} onClick={() => setSt(k)}>{l}</button>)}
-      <button onClick={() => setBln(bln ? "" : today().slice(0, 7))}>{bln ? "Semua bulan" : "Bulan ini"}</button><button onClick={s.all}>Pilih semua</button></div>
+    <div className="bar"><input placeholder="Cari pembeli / tanggal" value={q} onChange={(e) => setQ(e.target.value)} /></div>
+    <div className="bar"><MonthSelect items={items} value={bln} onChange={setBln} />
+      <select value={st} onChange={(e) => setSt(e.target.value)}><option value="semua">Semua</option><option value="belum">Belum lunas</option><option value="lunas">Sudah lunas</option></select>
+      <button className="csv" onClick={exp}>⬇ CSV</button></div>
+    <label className="all"><input type="checkbox" checked={list.length > 0 && s.n === list.length} onChange={s.all} /> Pilih semua</label>
     <div className="list">
       {!list.length && <div className="empty">Belum ada data. Ketuk “+ Panen” untuk mulai.</div>}
       {list.map((x) => (<div className="row" key={x.id}>
@@ -120,9 +126,8 @@ function Pendapatan({ uid, tarif }) {
           <div className="r2">{kg(x.bersih)}{x.pembeli ? " · " + x.pembeli : ""}</div>
           <div className="r2">Untung bersih <b className="ok">{rp(x.untung)}</b></div></div>
         <div className="right">
-          {!x.dihapus && <button className="ic" aria-label="Tandai lunas" onClick={() => lunas(x)}>{x.lunas ? "✅" : "⚪"}</button>}
-          <Menu trash={!!x.dihapus} onView={() => setView(x)} onEdit={() => setForm(x)} onDel={() => del(x)}
-            onRestore={() => updateDoc(ref(x.id), { dihapus: false })} /></div></div>))}
+          <button className="ic" aria-label="Tandai lunas" onClick={() => lunas(x)}>{x.lunas ? "✅" : "⚪"}</button>
+          <Menu onView={() => setView(x)} onEdit={() => setForm(x)} onDel={() => del(x)} /></div></div>))}
     </div>
     <div className="sum"><div>
       <span>{s.n ? `${s.n} dipilih` : "Semua yang tampil"} ({s.rows.length} panen)</span><span>{kg(sum("kotor"))} kotor / {kg(sum("bersih"))} bersih</span>
@@ -184,27 +189,28 @@ function PForm({ init, tarif, uid, close, names }) {
 
 function Biaya({ uid }) {
   const items = useCol(uid, "biayaLain");
-  const [q, setQ] = useState(""), [bln, setBln] = useState(today().slice(0, 7)), [trash, setTrash] = useState(false);
+  const [q, setQ] = useState(""), [bln, setBln] = useState(today().slice(0, 7));
   const [form, setForm] = useState(null), [view, setView] = useState(null);
   const ref = (id) => doc(db, "users", uid, "biayaLain", id);
-  const list = useMemo(() => items.filter((x) => !!x.dihapus === trash && (!bln || x.tanggal.startsWith(bln))
-    && (!q || x.keterangan.toLowerCase().includes(q.toLowerCase()))), [items, q, bln, trash]);
+  const list = useMemo(() => items.filter((x) => !x.dihapus && (!bln || x.tanggal.startsWith(bln))
+    && (!q || x.keterangan.toLowerCase().includes(q.toLowerCase()))), [items, q, bln]);
   const s = useSel(list);
   const total = s.rows.reduce((a, x) => a + N(x.nominal), 0);
-  const del = (x) => confirm(`Yakin hapus biaya "${x.keterangan}"?`) && updateDoc(ref(x.id), { dihapus: true, terakhirDiedit: Date.now() });
+  const del = (x) => confirm(`Hapus permanen biaya "${x.keterangan}"? Tidak bisa dibatalkan.`) && deleteDoc(ref(x.id));
+  const exp = () => saveFile(`biaya-${bln || "semua"}.csv`, biayaCsv(list), "text/csv");
   return (<>
     <button className="add" onClick={() => setForm({})}>+ Biaya Baru</button>
-    <div className="bar"><input placeholder="Cari keterangan (mis. pupuk)" value={q} onChange={(e) => setQ(e.target.value)} />
-      <input type="month" value={bln} onChange={(e) => setBln(e.target.value)} style={{ flex: "0 0 150px" }} /></div>
-    <div className="chips"><button className={!trash ? "on" : ""} onClick={() => setTrash(false)}>Aktif</button>
-      <button className={trash ? "on" : ""} onClick={() => setTrash(true)}>Sampah</button><button onClick={() => setBln(bln ? "" : today().slice(0, 7))}>{bln ? "Semua bulan" : "Bulan ini"}</button><button onClick={s.all}>Pilih semua</button></div>
+    <div className="bar"><input placeholder="Cari keterangan (mis. pupuk)" value={q} onChange={(e) => setQ(e.target.value)} /></div>
+    <div className="bar"><MonthSelect items={items} value={bln} onChange={setBln} />
+      <button className="csv" onClick={exp}>⬇ CSV</button></div>
+    <label className="all"><input type="checkbox" checked={list.length > 0 && s.n === list.length} onChange={s.all} /> Pilih semua</label>
     <div className="list two">
       {!list.length && <div className="empty">Belum ada biaya.</div>}
       {list.map((x) => (<div className="row" key={x.id}>
         <input type="checkbox" checked={s.sel.has(x.id)} onChange={() => s.toggle(x.id)} />
         <div onClick={() => setView(x)}><div className="r1"><span className="big">{x.tanggal}</span><span className="big">{rp(x.nominal)}</span></div>
           <div className="r2">{x.keterangan}</div></div>
-        <Menu trash={trash} onView={() => setView(x)} onEdit={() => setForm(x)} onDel={() => del(x)} onRestore={() => updateDoc(ref(x.id), { dihapus: false })} />
+        <Menu onView={() => setView(x)} onEdit={() => setForm(x)} onDel={() => del(x)} />
       </div>))}</div>
     <div className="sum"><div><span>{s.n ? `${s.n} dipilih` : "Grand total"} ({s.rows.length} biaya)</span><span className="u">{rp(total)}</span></div></div>
     {form && <BForm init={form} uid={uid} close={() => setForm(null)} />}
@@ -233,12 +239,6 @@ function BForm({ init, uid, close }) {
 
 function Pengaturan({ uid, tarif }) {
   const pend = useCol(uid, "pendapatan"), biaya = useCol(uid, "biayaLain");
-  const [bl, setBl] = useState("");
-  const pick = (a) => a.filter((x) => !x.dihapus && (!bl || x.tanggal.startsWith(bl))).sort((a, b) => a.tanggal.localeCompare(b.tanggal));
-  const sfx = bl || "semua";
-  const expPend = () => saveFile(`pendapatan-${sfx}.csv`, csv([["Tanggal", "Tipe", "Berat kotor", "Berat bersih", "Harga", "Total", "Pembeli", "Ongkos angkut", "Ongkos panen", "Fee Acut", "Untung bersih", "Lunas", "Tanggal lunas"],
-    ...pick(pend).map((x) => [x.tanggal, x.tipe, x.kotor, x.bersih, x.harga, x.total, x.pembeli, x.ongkosAngkut, x.ongkosPanen, x.fee, x.untung, x.lunas ? "Ya" : "Belum", x.tanggalLunas])]), "text/csv");
-  const expBiaya = () => saveFile(`biaya-${sfx}.csv`, csv([["Tanggal", "Keterangan", "Nominal"], ...pick(biaya).map((x) => [x.tanggal, x.keterangan, x.nominal])]), "text/csv");
   const backup = () => saveFile(`cadangan-buku-kebun-${today()}.json`, JSON.stringify({ dibuat: today(), tarif, pendapatan: pend, biayaLain: biaya }, null, 1), "text/plain");
   const [t, setT] = useState(tarif);
   const save = async () => { await setDoc(doc(db, "users", uid, "settings", "tarif"), { angkut: N(t.angkut), panen: N(t.panen), fee: N(t.fee) }); alert("Tarif disimpan. Berlaku untuk panen baru."); };
@@ -247,12 +247,8 @@ function Pengaturan({ uid, tarif }) {
     {f("angkut", "Ongkos angkut (Rp/kg kotor)")}{f("panen", "Ongkos panen (Rp/kg bersih)")}{f("fee", "Fee Acut (%)")}</div>
     <p className="r2">Data panen lama tidak ikut berubah; tiap panen menyimpan tarifnya sendiri.</p>
     <div className="btns"><button className="pri" onClick={save}>Simpan tarif</button></div>
-    <h3>Data</h3><div className="card">
-      <label className="r2">Bulan untuk ekspor CSV (kosongkan = semua data)</label>
-      <input type="month" value={bl} onChange={(e) => setBl(e.target.value)} style={{ width: "100%", padding: 10, margin: "6px 0 10px", border: "1px solid var(--ln)", borderRadius: 8 }} />
-      <div className="btns" style={{ marginTop: 0 }}><button onClick={expPend}>⬇️ Pendapatan</button><button onClick={expBiaya}>⬇️ Biaya</button></div>
-      <p className="r2">File CSV bisa dibuka di Excel. Setelah ditekan, pilih Simpan ke File / Drive / WhatsApp.</p>
-      <div className="btns" style={{ marginTop: 0 }}><button onClick={backup}>💾 Cadangan semua data</button></div></div>
+    <h3>Data</h3><div className="card"><div className="btns" style={{ marginTop: 0 }}><button onClick={backup}>💾 Cadangan semua data</button></div>
+      <p className="r2">Simpan file cadangan ke Drive sebulan sekali. Unduh CSV ada di menu Panen dan Biaya.</p></div>
     <div className="btns"><button className="del" onClick={() => signOut(auth)}>Keluar (logout)</button></div></>);
 }
 

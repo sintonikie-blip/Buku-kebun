@@ -41,3 +41,5 @@ button,input,select{font:inherit;color:inherit}
 .login button{background:var(--g);color:var(--bg);font-weight:700}.err{color:var(--red);font-size:14px}
 .empty{text-align:center;color:var(--mute);padding:30px}.dl{display:grid;grid-template-columns:1fr auto;gap:6px 10px}
 .wa{width:100%;padding:12px;margin-bottom:10px;background:#1f9d55;color:#fff;border:0;border-radius:10px;font-weight:700;font-size:15px}
+.bar select{background:#eef3f8}.csv{flex:none;background:#1b6b3a;color:#fff;border:0;border-radius:8px;padding:10px 16px;font-weight:700}
+.all{display:flex;align-items:center;gap:8px;margin:0 0 10px;color:var(--mute);font-size:14px}.all input{width:20px;height:20px;accent-color:var(--g)}
