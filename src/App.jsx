@@ -281,6 +281,13 @@ function Rekap({ uid }) {
       `Lunas ${s.lunas}, belum ${s.belum} (${rp(s.belumRp)})`].join("\n");
     window.open("https://wa.me/?text=" + encodeURIComponent(t), "_blank");
   };
+  const expRekap = () => {
+    const ms = [...new Set([...pend, ...biaya].filter((x) => !x.dihapus).map((x) => x.tanggal.slice(0, 7)))].sort();
+    if (!ms.length) return alert("Belum ada data.");
+    const rows = ms.map((mm) => { const t = stat(mm); return [lbl(mm), t.n, t.bersih, t.total, t.angkut, t.panen, t.fee, t.untung, t.biayaLain, t.laba]; });
+    const tot = rows.reduce((acc, r) => acc.map((v, i) => (i === 0 ? "TOTAL" : v + r[i])), ["", ...Array(9).fill(0)]);
+    saveFile("rekap-bulanan.csv", csv([["Bulan", "Jumlah panen", "Berat bersih (kg)", "Pendapatan", "Ongkos angkut", "Ongkos panen", "Fee Acut", "Untung bersih panen", "Biaya lain", "Laba akhir"], ...rows, tot]), "text/csv");
+  };
   const row = (l, v, b) => <><span className={b ? "big" : ""}>{l}</span><span className={b ? "big" : ""}>{v}</span></>;
   return (<>
     <div className="mn"><button className="ic" onClick={() => setM(shift(m, -1))}>◀</button>
@@ -290,6 +297,7 @@ function Rekap({ uid }) {
       <div className="r2">{diff === null ? "Belum ada pembanding bulan lalu" :
         `${diff >= 0 ? "▲ naik" : "▼ turun"} ${Math.abs(diff).toFixed(0)}% dari ${lbl(shift(m, -1))} (${rp(prev.laba)})`}</div></div>
     <button className="wa" onClick={wa}>📤 Bagikan rekap ke WhatsApp</button>
+    <button className="wa" style={{ background: "#1b6b3a" }} onClick={expRekap}>⬇ Unduh rekap bulanan (CSV)</button>
     <div className="card"><h4>Panen</h4><div className="dl">
       {row("Jumlah panen", s.n + "x")}{row("Berat kotor", kg(s.kotor))}{row("Berat bersih", kg(s.bersih))}</div></div>
     <div className="card"><h4>Per tipe buah</h4><div className="dl">
