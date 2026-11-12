@@ -208,14 +208,14 @@ function Biaya({ uid }) {
       {!list.length && <div className="empty">Belum ada biaya.</div>}
       {list.map((x) => (<div className="row" key={x.id}>
         <input type="checkbox" checked={s.sel.has(x.id)} onChange={() => s.toggle(x.id)} />
-        <div onClick={() => setView(x)}><div className="r1"><span className="big">{x.tanggal}</span><span className="big">{rp(x.nominal)}</span></div>
+        <div onClick={() => setView(x)}><div className="r1"><span className="big">{x.tanggal}</span><span className="big cost">{rp(x.nominal)}</span></div>
           <div className="r2">{x.keterangan}</div></div>
         <Menu onView={() => setView(x)} onEdit={() => setForm(x)} onDel={() => del(x)} />
       </div>))}</div>
-    <div className="sum"><div><span>{s.n ? `${s.n} dipilih` : "Grand total"} ({s.rows.length} biaya)</span><span className="u">{rp(total)}</span></div></div>
+    <div className="sum"><div><span>{s.n ? `${s.n} dipilih` : "Grand total"} ({s.rows.length} biaya)</span><span className="u cost">{rp(total)}</span></div></div>
     {form && <BForm init={form} uid={uid} close={() => setForm(null)} />}
     {view && <Sheet close={() => setView(null)}><h3>Biaya {view.tanggal}</h3><div className="dl">
-      <span>Keterangan</span><span>{view.keterangan}</span><span className="big">Nominal</span><b>{rp(view.nominal)}</b></div>
+      <span>Keterangan</span><span>{view.keterangan}</span><span className="big">Nominal</span><b className="cost">{rp(view.nominal)}</b></div>
       <div className="btns"><button onClick={() => { setForm(view); setView(null); }}>Edit</button>
         <button className="del" onClick={() => { del(view); setView(null); }}>Hapus</button></div></Sheet>}
   </>);
@@ -288,7 +288,7 @@ function Rekap({ uid }) {
     const tot = rows.reduce((acc, r) => acc.map((v, i) => (i === 0 ? "TOTAL" : v + r[i])), ["", ...Array(9).fill(0)]);
     saveFile("rekap-bulanan.csv", csv([["Bulan", "Jumlah panen", "Berat bersih (kg)", "Pendapatan", "Ongkos angkut", "Ongkos panen", "Fee Acut", "Untung bersih panen", "Biaya lain", "Laba akhir"], ...rows, tot]), "text/csv");
   };
-  const row = (l, v, b) => <><span className={b ? "big" : ""}>{l}</span><span className={b ? "big" : ""}>{v}</span></>;
+  const row = (l, v, b, c) => <><span className={b ? "big" : ""}>{l}</span><span className={(b ? "big " : "") + (c || "")}>{v}</span></>;
   return (<>
     <div className="mn"><button className="ic" onClick={() => setM(shift(m, -1))}>◀</button>
       <b>{lbl(m)}</b><button className="ic" onClick={() => setM(shift(m, 1))}>▶</button></div>
@@ -305,8 +305,8 @@ function Rekap({ uid }) {
         <span className="r2">{s[t].n}x · {kg(s[t].bersih)}</span><span className="r2">rata-rata {rp(s[t].avg)}/kg</span></>)}</div></div>
     <div className="card"><h4>Hitungan</h4><div className="dl">
       {row("Pendapatan", rp(s.total), 1)}{row("Ongkos angkut", "− " + rp(s.angkut))}{row("Ongkos panen", "− " + rp(s.panen))}
-      {row("Fee Acut", "− " + rp(s.fee))}{row("Untung bersih panen", rp(s.untung), 1)}
-      {row("Biaya lain", "− " + rp(s.biayaLain))}{row("Laba akhir bulan", rp(s.laba), 1)}</div></div>
+      {row("Fee Acut", "− " + rp(s.fee))}{row("Untung bersih panen", rp(s.untung), 1, "ok")}
+      {row("Biaya lain", "− " + rp(s.biayaLain), 0, "cost")}{row("Laba akhir bulan", rp(s.laba), 1, s.laba < 0 ? "neg" : "ok")}</div></div>
     <div className="card"><h4>Status lunas</h4><div className="dl">
       {row("Sudah lunas", s.lunas + " panen")}{row("Belum lunas", s.belum + " panen")}{row("Untung belum lunas", rp(s.belumRp))}</div></div>
     <div className="card"><h4>Laba 6 bulan terakhir</h4>

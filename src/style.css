@@ -1,4 +1,4 @@
-:root{color-scheme:light;--g:#1f4d2b;--a:#b9790a;--ink:#111;--bg:#fff;--card:#fff;--ln:#c9c9bd;--mute:#555;--red:#b3261e}
+:root{color-scheme:light;--profit:#16b84a;--cost:#d32f2f;--g:#1f4d2b;--a:#b9790a;--ink:#111;--bg:#fff;--card:#fff;--ln:#c9c9bd;--mute:#555;--red:#b3261e}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 system-ui,sans-serif}
 button,input,select{font:inherit;color:inherit}
 .hd{position:sticky;top:0;z-index:5;background:var(--g);color:#fff;text-align:center;font-weight:700;padding:12px;padding-top:calc(12px + env(safe-area-inset-top,0px))}
@@ -20,13 +20,13 @@ button,input,select{font:inherit;color:inherit}
 .row{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;background:var(--card);border:1px solid var(--ln);border-radius:10px;padding:10px}
 .row input[type=checkbox]{width:22px;height:22px;accent-color:var(--g)}
 .r1{display:flex;justify-content:space-between;gap:8px}.r2{color:var(--mute);font-size:14px}
-.big{font-weight:700}.ok{color:var(--g)}.ic{background:none;border:0;font-size:22px;padding:4px 6px}
+.big{font-weight:700}.ok{color:var(--profit)}.ic{background:none;border:0;font-size:22px;padding:4px 6px}
 .right{display:flex;align-items:center;position:relative}
 .dd{position:absolute;right:0;top:100%;z-index:4;background:var(--card);border:1px solid var(--ln);border-radius:8px;min-width:130px;box-shadow:0 4px 14px #0003}
 .dd button{display:block;width:100%;text-align:left;background:none;border:0;padding:10px 14px}
 .sum{position:fixed;left:0;right:0;bottom:calc(58px + env(safe-area-inset-bottom,0px));background:var(--card);border-top:2px solid var(--g);padding:10px 14px}
 .sum div{max-width:720px;margin:0 auto;display:grid;grid-template-columns:1fr auto;gap:2px 10px;font-size:14px}
-.sum .u{font-size:18px;font-weight:700;color:var(--g)}
+.sum .u{font-size:18px;font-weight:700;color:var(--profit)}
 .add{width:100%;padding:13px;margin-bottom:10px;background:var(--a);color:#fff;border:0;border-radius:10px;font-weight:700;font-size:16px}
 .modal{position:fixed;inset:0;background:#0007;z-index:20;display:flex;align-items:flex-end;justify-content:center}
 .sheet{background:var(--bg);width:100%;max-width:560px;max-height:92vh;overflow:auto;border-radius:16px 16px 0 0;padding:16px}
@@ -43,3 +43,4 @@ button,input,select{font:inherit;color:inherit}
 .wa{width:100%;padding:12px;margin-bottom:10px;background:#1f9d55;color:#fff;border:0;border-radius:10px;font-weight:700;font-size:15px}
 .bar select{background:#eef3f8}.csv{flex:none;background:#1b6b3a;color:#fff;border:0;border-radius:8px;padding:10px 16px;font-weight:700}
 .all{display:flex;align-items:center;gap:8px;margin:0 0 10px;color:var(--mute);font-size:14px}.all input{width:20px;height:20px;accent-color:var(--g)}
+.cost,.sum .u.cost{color:var(--cost)}
