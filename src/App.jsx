@@ -122,6 +122,7 @@ function Pendapatan({ uid, tarif }) {
   const lunas = (x) => updateDoc(ref(x.id), { lunas: !x.lunas, tanggalLunas: x.lunas ? "" : today() });
   return (<>
     <button className="add" onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); burst(e.clientX || r.left + r.width / 2, e.clientY || r.top + r.height / 2); setTimeout(() => setForm({}), 300); }}>+ Panen Baru</button>
+    <Perkiraan uid={uid} items={items} />
     <div className="bar"><input placeholder="Cari pembeli / tanggal" value={q} onChange={(e) => setQ(e.target.value)} /></div>
     <div className="bar"><MonthSelect items={items} value={bln} onChange={setBln} />
       <select value={st} onChange={(e) => setSt(e.target.value)}><option value="semua">Semua</option><option value="belum">Belum lunas</option><option value="lunas">Sudah lunas</option></select>
@@ -251,12 +252,35 @@ function Pengaturan({ uid, tarif }) {
   const pend = useCol(uid, "pendapatan"), biaya = useCol(uid, "biayaLain"), cat = useCol(uid, "catatan");
   const backup = () => saveFile(`cadangan-buku-kebun-${today()}.json`, JSON.stringify({ dibuat: today(), tarif, pendapatan: pend, biayaLain: biaya, catatan: cat }, null, 1), "text/plain");
   const [t, setT] = useState(tarif);
+  const [lok, setLok] = useState({ nama: "", lat: "", lon: "" }), [hasil, setHasil] = useState([]), [q2, setQ2] = useState("");
+  useEffect(() => onSnapshot(doc(db, "users", uid, "settings", "lokasi"), (sn) => sn.exists() && setLok({ nama: sn.data().nama || "", lat: String(sn.data().lat), lon: String(sn.data().lon) })), [uid]);
+  const cari = async () => {
+    try {
+      const r = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q2)}&count=6&language=id`), j = await r.json();
+      setHasil(j.results || []); if (!(j.results || []).length) alert("Lokasi tidak ditemukan. Coba nama kecamatan atau kota terdekat, atau isi koordinat manual.");
+    } catch { alert("Gagal mencari. Periksa internet."); }
+  };
+  const gps = () => (navigator.geolocation ? navigator.geolocation.getCurrentPosition((p) => setLok({ nama: "Lokasi saya", lat: p.coords.latitude.toFixed(4), lon: p.coords.longitude.toFixed(4) }), () => alert("Tidak bisa mengambil lokasi. Isi manual saja."), { timeout: 10000 }) : alert("Perangkat tidak mendukung lokasi."));
+  const simpanLok = async () => {
+    const la = Number(lok.lat), lo = Number(lok.lon);
+    if (!lok.lat.trim() || !lok.lon.trim() || !isFinite(la) || !isFinite(lo) || Math.abs(la) > 90 || Math.abs(lo) > 180) return alert("Koordinat tidak valid.");
+    await setDoc(doc(db, "users", uid, "settings", "lokasi"), { nama: lok.nama, lat: la, lon: lo }); alert("Lokasi kebun disimpan.");
+  };
   const save = async () => { await setDoc(doc(db, "users", uid, "settings", "tarif"), { angkut: N(t.angkut), panen: N(t.panen), fee: N(t.fee) }); alert("Tarif disimpan. Berlaku untuk panen baru."); };
   const f = (k, l) => <label>{l}<input inputMode="decimal" value={t[k]} onChange={(e) => setT({ ...t, [k]: e.target.value })} /></label>;
   return (<><h3>Tarif</h3><div className="f">
     {f("angkut", "Ongkos angkut (Rp/kg kotor)")}{f("panen", "Ongkos panen (Rp/kg bersih)")}{f("fee", "Fee Acut (%)")}</div>
     <p className="r2">Data panen lama tidak ikut berubah; tiap panen menyimpan tarifnya sendiri.</p>
     <div className="btns"><button className="pri" onClick={save}>Simpan tarif</button></div>
+    <h3>Lokasi kebun (untuk cuaca)</h3><div className="card">
+      <div className="bar" style={{ marginBottom: 8 }}><input placeholder="Cari nama kecamatan / kota" value={q2} onChange={(e) => setQ2(e.target.value)} /><button className="csv" onClick={cari}>Cari</button></div>
+      {hasil.map((h) => <button key={h.id} className="hasil" onClick={() => { setLok({ nama: h.name, lat: String(h.latitude), lon: String(h.longitude) }); setHasil([]); }}>{h.name}{h.admin1 ? ", " + h.admin1 : ""}</button>)}
+      <div className="f" style={{ marginTop: 6 }}>
+        <label className="full">Nama lokasi<input value={lok.nama} onChange={(e) => setLok({ ...lok, nama: e.target.value })} /></label>
+        <label>Lintang<input inputMode="decimal" placeholder="-1.2345" value={lok.lat} onChange={(e) => setLok({ ...lok, lat: e.target.value })} /></label>
+        <label>Bujur<input inputMode="decimal" placeholder="101.2345" value={lok.lon} onChange={(e) => setLok({ ...lok, lon: e.target.value })} /></label></div>
+      <p className="r2" style={{ margin: "6px 0 0" }}>Koordinat pas: di Google Maps tekan lama titik kebun, lalu salin angkanya.</p>
+      <div className="btns"><button onClick={gps}>📍 Lokasi saya</button><button className="pri" onClick={simpanLok}>Simpan lokasi</button></div></div>
     <h3>Data</h3><div className="card"><div className="btns" style={{ marginTop: 0 }}><button onClick={backup}>💾 Cadangan semua data</button></div>
       <p className="r2">Simpan file cadangan ke Drive sebulan sekali. Unduh CSV ada di menu Panen dan Biaya.</p></div>
     <div className="btns"><button className="del" onClick={() => signOut(auth)}>Keluar (logout)</button></div></>);
@@ -487,4 +511,59 @@ function Pulihkan({ uid }) {
       <p className="r2" style={{ margin: "8px 0 0" }}>Tarif di file akan menggantikan tarif sekarang di Atur.</p>
       <div className="btns"><button onClick={() => setInfo(null)}>Batal</button><button className="pri" disabled={busy} onClick={pulihkan}>{busy ? "Memulihkan…" : "♻️ Pulihkan sekarang"}</button></div></div>}
   </>);
+}
+
+const dn = (t) => Math.round(Date.UTC(+t.slice(0, 4), +t.slice(5, 7) - 1, +t.slice(8, 10)) / 864e5);
+const addD = (t, d) => new Date((dn(t) + d) * 864e5).toISOString().slice(0, 10);
+const dm = (t) => `${+t.slice(8)} ${BULAN[+t.slice(5, 7) - 1].slice(0, 3)}`;
+const rentang = (a, b) => (a === b ? dm(a) : a.slice(0, 7) === b.slice(0, 7) ? `${+a.slice(8)}–${dm(b)}` : `${dm(a)} – ${dm(b)}`);
+const HARI = ["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"];
+const wi = (c) => (c === 0 ? "☀️" : c <= 2 ? "🌤️" : c === 3 ? "☁️" : c <= 48 ? "🌫️" : c <= 57 ? "🌦️" : c <= 67 ? "🌧️" : c <= 77 ? "🌨️" : c <= 82 ? "🌧️" : "⛈️");
+
+function Perkiraan({ uid, items }) {
+  const [lok, setLok] = useState(undefined), [cw, setCw] = useState(null);
+  const [open, setOpen] = useState(() => { try { return localStorage.getItem("fcOpen") === "1"; } catch { return false; } });
+  const toggle = () => { const v = !open; setOpen(v); try { localStorage.setItem("fcOpen", v ? "1" : "0"); } catch {} };
+  useEffect(() => onSnapshot(doc(db, "users", uid, "settings", "lokasi"), (sn) => setLok(sn.exists() ? sn.data() : null)), [uid]);
+  const la = lok && lok.lat, lo = lok && lok.lon;
+  useEffect(() => {
+    if (la == null || lo == null) return;
+    let off = false; const key = `cuaca:${la},${lo}`;
+    fetch(`https://api.open-meteo.com/v1/forecast?latitude=${la}&longitude=${lo}&daily=weathercode,precipitation_sum,precipitation_probability_max&timezone=auto&forecast_days=7`)
+      .then((r) => r.json()).then((j) => { if (off || !j.daily) throw 0; const d = { t: Date.now(), daily: j.daily }; try { localStorage.setItem(key, JSON.stringify(d)); } catch {} setCw(d); })
+      .catch(() => { if (off) return; try { const c = JSON.parse(localStorage.getItem(key) || "null"); setCw(c ? { ...c, lama: true } : "gagal"); } catch { setCw("gagal"); } });
+    return () => { off = true; };
+  }, [la, lo]);
+  const act = items.filter((x) => !x.dihapus), tg = [...new Set(act.map((x) => x.tanggal))].sort();
+  let l1, l1b = "", info = "", s1 = "";
+  if (tg.length < 4) { l1 = "🔮 Perkiraan panen: data belum cukup (minimal 4 panen)"; s1 = "🔮 Data belum cukup"; }
+  else {
+    const dts = tg.slice(-7), gaps = dts.slice(1).map((d, i) => dn(d) - dn(dts[i])).sort((a, b) => a - b), n = gaps.length;
+    const med = (gaps[(n - 1) >> 1] + gaps[n >> 1]) / 2, last = tg[tg.length - 1], ago = dn(today()) - dn(last);
+    const ws = tg.slice(-5).map((d) => act.filter((x) => x.tanggal === d).reduce((a, x) => a + N(x.bersih), 0));
+    const avg = ws.reduce((a, v, i) => a + v * (i + 1), 0) / ((ws.length * (ws.length + 1)) / 2), r10 = (v) => Math.round(v / 10) * 10;
+    const from = addD(last, gaps[0]), to = addD(last, gaps[n - 1]);
+    info = `Panen terakhir ${dm(last)} (${ago} hari lalu). Jarak antar panen biasanya ${gaps[0]}–${gaps[n - 1]} hari, tengahnya ${med} hari.`;
+    l1 = dn(to) < dn(today()) ? `🔮 Sudah ${ago} hari sejak panen terakhir, lewat dari kebiasaan (tiap ~${Math.round(med)} hari)` : `🔮 Panen berikutnya sekitar ${rentang(from, to)}`;
+    s1 = dn(to) < dn(today()) ? `🔮 Sudah ${ago} hari sejak panen` : `🔮 Panen ${rentang(from, to)}`;
+    const nf = (v) => r10(v).toLocaleString("id-ID");
+    l1b = `≈ ${kg(r10(avg))} (${nf(Math.min(...ws))}–${nf(Math.max(...ws))} kg)`;
+  }
+  let w = "🌦️ Atur lokasi kebun di menu Atur untuk melihat cuaca", s2 = "🌦️ Atur lokasi", days = [];
+  if (lok && cw === "gagal") { w = "🌦️ Cuaca tidak tersedia (periksa internet)"; s2 = "🌦️ Cuaca off"; }
+  else if (lok && cw) {
+    const d = cw.daily; days = d.time.map((t, i) => ({ t, c: d.weathercode[i], mm: d.precipitation_sum[i], p: d.precipitation_probability_max[i], rain: (d.precipitation_probability_max[i] || 0) >= 60 || (d.precipitation_sum[i] || 0) >= 5 }));
+    const rn = days.filter((x) => x.rain), lst = rn.map((x) => `${HARI[new Date(x.t + "T00:00").getDay()]} ${+x.t.slice(8)}`).join(", ");
+    w = (rn.length ? `🌧️ Hujan: ${lst}` : "☀️ Tidak ada hujan berarti 7 hari ke depan") + (cw.lama ? " (data lama)" : "");
+    s2 = rn.length ? `🌧️ ${lst}` : "☀️ Kering";
+  } else if (lok) { w = "🌦️ Memuat cuaca…"; s2 = "🌦️ …"; }
+  return (<div className="fc" onClick={toggle}>
+    {open ? <>
+      <div className="l1">{l1}</div>{l1b && <div className="l2">{l1b}</div>}<div className="l2">{w}</div>
+      {info && <div className="l2" style={{ marginTop: 6 }}>{info}</div>}
+      {days.length > 0 && <div className="fcgrid">{days.map((x) => <div key={x.t} className={x.rain ? "rainy" : ""}><div>{HARI[new Date(x.t + "T00:00").getDay()]} {+x.t.slice(8)}</div><div className="ic2">{wi(x.c)}</div><div>{x.p == null ? "-" : x.p + "%"}</div><div>{Math.round(x.mm || 0)} mm</div></div>)}</div>}
+      <div className="l2" style={{ marginTop: 6 }}>Hanya perkiraan dari data panenmu dan prakiraan cuaca, bukan jaminan.</div>
+      <div className="r2" style={{ textAlign: "center", fontSize: 11 }}>▲ tutup</div></>
+    : <div className="one"><span className="oneT">{s1} · {s2}</span><span>▼</span></div>}
+  </div>);
 }

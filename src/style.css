@@ -65,3 +65,10 @@ button,input,select{font:inherit;color:inherit}
 .notetext{white-space:pre-wrap;word-break:break-word;font-weight:600;margin-top:2px}
 .f textarea{grid-column:1/-1;width:100%;padding:11px;border:1.5px solid var(--ln);border-radius:12px;background:#fff;font-weight:600;resize:vertical}
 .btns .pri:disabled{opacity:.6}
+.fc{background:linear-gradient(135deg,#eaf2ff,#f1ecff);border:1.5px solid var(--cb);border-radius:16px;padding:10px 12px;margin-bottom:10px;cursor:pointer}
+.fc .l1{font-weight:800;font-size:14px}.fc .l2{font-size:13px;font-weight:700;color:var(--mute);margin-top:2px}
+.fcgrid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;text-align:center;margin-top:8px;font-size:10.5px;font-weight:700;color:var(--mute)}
+.fcgrid>div{padding:4px 0;border-radius:8px}.fcgrid .ic2{font-size:19px;padding:0}.fcgrid .rainy{background:#d6e6ff;color:#1c3d7a}
+.hasil{display:block;width:100%;text-align:left;background:#fff;border:1.5px solid var(--ln);border-radius:10px;padding:9px 12px;margin-bottom:6px;font-weight:700}
+.fc .one{display:flex;justify-content:space-between;align-items:center;gap:8px;font-weight:800;font-size:13px}.fc .oneT{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.fc:has(.one){padding:8px 12px}
