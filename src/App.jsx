@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { onAuthStateChanged, signInWithEmailAndPassword, signOut } from "firebase/auth";
-import { collection, doc, onSnapshot, addDoc, updateDoc, setDoc, deleteDoc } from "firebase/firestore";
+import { collection, doc, onSnapshot, addDoc, updateDoc, setDoc, deleteDoc, writeBatch } from "firebase/firestore";
 import { auth, db } from "./firebase";
 
 const rp = (n) => "Rp" + Math.round(n || 0).toLocaleString("id-ID");
@@ -248,8 +248,8 @@ function BForm({ init, uid, close }) {
 }
 
 function Pengaturan({ uid, tarif }) {
-  const pend = useCol(uid, "pendapatan"), biaya = useCol(uid, "biayaLain");
-  const backup = () => saveFile(`cadangan-buku-kebun-${today()}.json`, JSON.stringify({ dibuat: today(), tarif, pendapatan: pend, biayaLain: biaya }, null, 1), "text/plain");
+  const pend = useCol(uid, "pendapatan"), biaya = useCol(uid, "biayaLain"), cat = useCol(uid, "catatan");
+  const backup = () => saveFile(`cadangan-buku-kebun-${today()}.json`, JSON.stringify({ dibuat: today(), tarif, pendapatan: pend, biayaLain: biaya, catatan: cat }, null, 1), "text/plain");
   const [t, setT] = useState(tarif);
   const save = async () => { await setDoc(doc(db, "users", uid, "settings", "tarif"), { angkut: N(t.angkut), panen: N(t.panen), fee: N(t.fee) }); alert("Tarif disimpan. Berlaku untuk panen baru."); };
   const f = (k, l) => <label>{l}<input inputMode="decimal" value={t[k]} onChange={(e) => setT({ ...t, [k]: e.target.value })} /></label>;
@@ -328,11 +328,15 @@ function Rekap({ uid }) {
 
 function Lainnya({ uid }) {
   const [sub, setSub] = useState("");
-  if (sub) return (<><button className="back" onClick={() => setSub("")}>← Kembali</button>{sub === "acut" ? <Acut uid={uid} /> : <Tren uid={uid} />}</>);
+  const C = { acut: Acut, tren: Tren, tahun: Tahunan, notes: Notepad, pulih: Pulihkan }[sub];
+  if (C) return (<><button className="back" onClick={() => setSub("")}>← Kembali</button><C uid={uid} /></>);
   const it = (k, ic, t, d) => <button className="mi-btn" onClick={() => setSub(k)}><span className="mi">{ic}</span><span><b>{t}</b><br /><span className="r2">{d}</span></span></button>;
   return (<div className="list">
     {it("acut", "👤", "Acut", "Fee per bulan, sudah dibayar atau belum")}
     {it("tren", "📈", "Tren produksi", "Berat panen dan harga per kg dari waktu ke waktu")}
+    {it("tahun", "📆", "Rekap tahunan", "Total dan laba satu tahun, grafik per bulan")}
+    {it("notes", "📝", "Notepad kebun", "Catatan bebas bertanggal")}
+    {it("pulih", "♻️", "Pulihkan cadangan", "Kembalikan data dari file cadangan")}
   </div>);
 }
 
@@ -381,5 +385,106 @@ function Tren({ uid }) {
     <div className="card"><h4>Harga rata-rata per kg</h4><div className="tbl">
       <span className="r2">Bulan</span><span className="r2">BB</span><span className="r2">BK</span>
       {data.map((d) => <><span className="big">{sm(d.mm)}</span><span>{d.BB.avg ? rp(d.BB.avg) : "-"}</span><span>{d.BK.avg ? rp(d.BK.avg) : "-"}</span></>)}</div></div>
+  </>);
+}
+
+function agg(pend, biaya, pref) {
+  const p = pend.filter((x) => !x.dihapus && x.tanggal.startsWith(pref)), b = biaya.filter((x) => !x.dihapus && x.tanggal.startsWith(pref));
+  const sum = (a, k) => a.reduce((t, x) => t + N(x[k]), 0);
+  const untung = sum(p, "untung"), biayaLain = sum(b, "nominal");
+  return { n: p.length, ada: p.length + b.length, kotor: sum(p, "kotor"), bersih: sum(p, "bersih"), total: sum(p, "total"), angkut: sum(p, "ongkosAngkut"),
+    panen: sum(p, "ongkosPanen"), fee: sum(p, "fee"), untung, biayaLain, laba: untung - biayaLain };
+}
+
+function Tahunan({ uid }) {
+  const pend = useCol(uid, "pendapatan"), biaya = useCol(uid, "biayaLain");
+  const [y, setY] = useState(today().slice(0, 4));
+  const s = agg(pend, biaya, y), prev = agg(pend, biaya, String(Number(y) - 1));
+  const diff = prev.ada && prev.laba ? ((s.laba - prev.laba) / Math.abs(prev.laba)) * 100 : null;
+  const months = Array.from({ length: 12 }, (_, i) => { const mm = `${y}-${String(i + 1).padStart(2, "0")}`; const a = agg(pend, biaya, mm); return { i, laba: a.laba, ada: a.ada }; });
+  const aktif = months.filter((x) => x.ada), max = Math.max(1, ...months.map((x) => Math.abs(x.laba)));
+  const best = aktif.reduce((a, x) => (x.laba > a.laba ? x : a), aktif[0] || { laba: 0, i: 0 });
+  const row = (l, v, b, c) => <><span className={b ? "big" : ""}>{l}</span><span className={(b ? "big " : "") + (c || "")}>{v}</span></>;
+  return (<>
+    <div className="mn"><button className="ic" onClick={() => setY(String(Number(y) - 1))}>◀</button><b>Tahun {y}</b><button className="ic" onClick={() => setY(String(Number(y) + 1))}>▶</button></div>
+    <div className="card hero"><div className="r2">Laba akhir tahun</div><div className={"hl " + (s.laba < 0 ? "neg" : "ok")}>{rp(s.laba)}</div>
+      <div className="r2">{diff === null ? "Belum ada pembanding tahun lalu" : `${diff >= 0 ? "▲ naik" : "▼ turun"} ${Math.abs(diff).toFixed(0)}% dari ${Number(y) - 1} (${rp(prev.laba)})`}</div></div>
+    <div className="card"><h4>Panen</h4><div className="dl">{row("Jumlah panen", s.n + "x")}{row("Berat kotor", kg(s.kotor))}{row("Berat bersih", kg(s.bersih))}</div></div>
+    <div className="card"><h4>Hitungan</h4><div className="dl">
+      {row("Pendapatan", rp(s.total), 1)}{row("Ongkos angkut", "− " + rp(s.angkut))}{row("Ongkos panen", "− " + rp(s.panen))}{row("Fee Acut", "− " + rp(s.fee))}
+      {row("Untung bersih panen", rp(s.untung), 1, "ok")}{row("Biaya lain", "− " + rp(s.biayaLain), 0, "cost")}{row("Laba akhir tahun", rp(s.laba), 1, s.laba < 0 ? "neg" : "ok")}</div></div>
+    <div className="card"><h4>Laba per bulan</h4>
+      {months.map((x) => <div className="b" key={x.i}><span>{BULAN[x.i].slice(0, 3)}</span>
+        <div className="track"><div className={"fill" + (x.laba < 0 ? " neg" : "")} style={{ width: (Math.abs(x.laba) / max) * 100 + "%" }} /></div><span>{x.ada ? rp(x.laba) : "-"}</span></div>)}
+      {aktif.length > 0 && <p className="r2" style={{ margin: "8px 0 0" }}>Terbaik: {BULAN[best.i]} ({rp(best.laba)}). Rata-rata {rp(s.laba / aktif.length)} per bulan ({aktif.length} bulan ada data).</p>}</div>
+  </>);
+}
+
+function Notepad({ uid }) {
+  const items = useCol(uid, "catatan");
+  const [q, setQ] = useState(""), [form, setForm] = useState(null);
+  const list = items.filter((x) => !q || x.teks.toLowerCase().includes(q.toLowerCase()) || x.tanggal.includes(q));
+  const del = (x) => confirm("Hapus permanen catatan ini? Tidak bisa dibatalkan.") && deleteDoc(doc(db, "users", uid, "catatan", x.id));
+  return (<>
+    <button className="add" onClick={() => setForm({})}>+ Catatan Baru</button>
+    <div className="bar"><input placeholder="Cari catatan" value={q} onChange={(e) => setQ(e.target.value)} /></div>
+    <div className="list">{!list.length && <div className="empty">Belum ada catatan.</div>}
+      {list.map((x) => (<div className="row note" key={x.id}>
+        <div style={{ minWidth: 0 }}><div className="r2">{tgl(x.tanggal)}</div><div className="notetext">{x.teks}</div></div>
+        <div className="acts"><button aria-label="Edit" onClick={() => setForm(x)}>✏️</button><button aria-label="Hapus" className="rm" onClick={() => del(x)}>🗑️</button></div></div>))}</div>
+    {form && <NoteForm init={form} uid={uid} close={() => setForm(null)} />}
+  </>);
+}
+
+function NoteForm({ init, uid, close }) {
+  const [d, setD] = useState({ tanggal: today(), teks: "", ...init });
+  const save = async () => {
+    if (!d.teks.trim()) return alert("Tulis catatannya dulu.");
+    const data = { tanggal: d.tanggal, teks: d.teks.trim(), terakhirDiedit: Date.now() };
+    if (init.id) await updateDoc(doc(db, "users", uid, "catatan", init.id), data);
+    else await addDoc(collection(db, "users", uid, "catatan"), data);
+    close();
+  };
+  return (<Sheet close={close}><h3>{init.id ? "Edit catatan" : "Catatan baru"}</h3><div className="f">
+    <label className="full">Tanggal<input type="date" value={d.tanggal} onChange={(e) => setD({ ...d, tanggal: e.target.value })} /></label>
+    <label className="full">Catatan<textarea rows={8} placeholder="Mis. hujan deras, buah banyak busuk; jalan rusak; timbangan rusak…" value={d.teks} onChange={(e) => setD({ ...d, teks: e.target.value })} /></label></div>
+    <div className="btns"><button onClick={close}>Batal</button><button className="pri" onClick={save}>Simpan</button></div></Sheet>);
+}
+
+function Pulihkan({ uid }) {
+  const [info, setInfo] = useState(null), [busy, setBusy] = useState(false);
+  const baca = async (e) => {
+    const f = e.target.files[0]; e.target.value = ""; if (!f) return;
+    try {
+      const j = JSON.parse(await f.text());
+      const ok = (a) => (Array.isArray(a) ? a : []).filter((x) => x && typeof x.id === "string" && typeof x.tanggal === "string" && !x.dihapus);
+      setInfo({ nama: f.name, dibuat: j.dibuat || "-", tarif: j.tarif || null, pendapatan: ok(j.pendapatan), biayaLain: ok(j.biayaLain), catatan: ok(j.catatan) });
+    } catch { alert("File tidak bisa dibaca. Pastikan ini file cadangan Buku Kebun (.json)."); }
+  };
+  const pulihkan = async () => {
+    if (!confirm(`Pulihkan ${info.pendapatan.length} panen, ${info.biayaLain.length} biaya, ${info.catatan.length} catatan?\nData dengan ID sama akan ditimpa, data lain tidak dihapus.`)) return;
+    setBusy(true);
+    try {
+      const ops = [];
+      for (const [col, arr] of [["pendapatan", info.pendapatan], ["biayaLain", info.biayaLain], ["catatan", info.catatan]])
+        for (const { id, ...data } of arr) ops.push([doc(db, "users", uid, col, id), data]);
+      if (info.tarif) ops.push([doc(db, "users", uid, "settings", "tarif"), { angkut: N(info.tarif.angkut), panen: N(info.tarif.panen), fee: N(info.tarif.fee) }]);
+      for (let i = 0; i < ops.length; i += 400) { const b = writeBatch(db); ops.slice(i, i + 400).forEach(([r, d]) => b.set(r, d)); await b.commit(); }
+      alert("Selesai. Data cadangan sudah dikembalikan."); setInfo(null);
+    } catch (e) { alert("Gagal memulihkan: " + e.message); }
+    setBusy(false);
+  };
+  return (<>
+    <div className="card"><h4>Pulihkan dari cadangan</h4>
+      <p className="r2" style={{ margin: 0 }}>Pilih file cadangan (.json) dari Atur → Data → Cadangan semua data. Data dengan ID yang sama ditimpa, data yang tidak ada di file tidak dihapus. Pastikan ada sinyal internet.</p></div>
+    <label className="add" style={{ display: "block", textAlign: "center" }}>📂 Pilih file cadangan
+      <input type="file" accept=".json,application/json,text/plain" hidden onChange={baca} /></label>
+    {info && <div className="card"><h4>Isi file</h4><div className="dl">
+      <span>File</span><span>{info.nama}</span><span>Dibuat</span><span>{info.dibuat}</span>
+      <span>Panen</span><span className="big">{info.pendapatan.length}</span><span>Biaya lain</span><span className="big">{info.biayaLain.length}</span>
+      <span>Catatan</span><span className="big">{info.catatan.length}</span>
+      <span>Tarif</span><span>{info.tarif ? `${info.tarif.angkut} / ${info.tarif.panen} / ${info.tarif.fee}%` : "-"}</span></div>
+      <p className="r2" style={{ margin: "8px 0 0" }}>Tarif di file akan menggantikan tarif sekarang di Atur.</p>
+      <div className="btns"><button onClick={() => setInfo(null)}>Batal</button><button className="pri" disabled={busy} onClick={pulihkan}>{busy ? "Memulihkan…" : "♻️ Pulihkan sekarang"}</button></div></div>}
   </>);
 }
