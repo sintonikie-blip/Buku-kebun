@@ -21,7 +21,7 @@ function MonthSelect({ items, value, onChange }) {
   const ms = [...new Set([today().slice(0, 7), ...items.filter((x) => !x.dihapus).map((x) => x.tanggal.slice(0, 7))])].sort().reverse();
   return <select value={value} onChange={(e) => onChange(e.target.value)}><option value="">Semua bulan</option>{ms.map((m) => <option key={m} value={m}>{lbl(m)}</option>)}</select>;
 }
-const TABS = [["pendapatan", "🌴", "Panen"], ["biaya", "🧾", "Biaya"], ["rekap", "📊", "Rekap"], ["set", "⚙️", "Atur"]];
+const TABS = [["pendapatan", "🌴", "Panen"], ["biaya", "🧾", "Biaya"], ["rekap", "📊", "Rekap"], ["lain", "➕", "Lainnya"], ["set", "⚙️", "Atur"]];
 const tgl = (t) => `${+t.slice(8)} ${BULAN[+t.slice(5, 7) - 1].slice(0, 3)} ${t.slice(2, 4)}`;
 // Animasi 1 detik: koin $ hijau dan buah sawit oranye meletup dari titik ketukan
 function burst(x, y) {
@@ -68,6 +68,7 @@ export default function App() {
       {tab === "pendapatan" && <Pendapatan uid={user.uid} tarif={tarif} />}
       {tab === "biaya" && <Biaya uid={user.uid} />}
       {tab === "rekap" && <Rekap uid={user.uid} />}
+      {tab === "lain" && <Lainnya uid={user.uid} />}
       {tab === "set" && <Pengaturan uid={user.uid} tarif={tarif} />}
     </div>
     <nav className="tabs">
@@ -322,5 +323,63 @@ function Rekap({ uid }) {
       {series.map((x) => <div className="b" key={x.mm}><span>{BULAN[Number(x.mm.split("-")[1]) - 1].slice(0, 3)} {x.mm.slice(2, 4)}</span>
         <div className="track"><div className={"fill" + (x.laba < 0 ? " neg" : "")} style={{ width: (Math.abs(x.laba) / max) * 100 + "%" }} /></div>
         <span>{rp(x.laba)}</span></div>)}</div>
+  </>);
+}
+
+function Lainnya({ uid }) {
+  const [sub, setSub] = useState("");
+  if (sub) return (<><button className="back" onClick={() => setSub("")}>← Kembali</button>{sub === "acut" ? <Acut uid={uid} /> : <Tren uid={uid} />}</>);
+  const it = (k, ic, t, d) => <button className="mi-btn" onClick={() => setSub(k)}><span className="mi">{ic}</span><span><b>{t}</b><br /><span className="r2">{d}</span></span></button>;
+  return (<div className="list">
+    {it("acut", "👤", "Acut", "Fee per bulan, sudah dibayar atau belum")}
+    {it("tren", "📈", "Tren produksi", "Berat panen dan harga per kg dari waktu ke waktu")}
+  </div>);
+}
+
+function Acut({ uid }) {
+  const pend = useCol(uid, "pendapatan").filter((x) => !x.dihapus);
+  const [m, setM] = useState(today().slice(0, 7));
+  const rows = pend.filter((x) => x.tanggal.startsWith(m));
+  const sum = (a) => a.reduce((t, x) => t + N(x.fee), 0);
+  const total = sum(rows), dibayar = sum(rows.filter((x) => x.lunas)), belum = total - dibayar, belumSemua = sum(pend.filter((x) => !x.lunas));
+  const wa = () => window.open("https://wa.me/?text=" + encodeURIComponent([`*Fee Acut ${lbl(m)}*`, `Jumlah panen: ${rows.length}x`, `Total fee: ${rp(total)}`, `Sudah dibayar: ${rp(dibayar)}`, `Belum dibayar: ${rp(belum)}`].join("\n")), "_blank");
+  return (<>
+    <div className="mn"><button className="ic" onClick={() => setM(shift(m, -1))}>◀</button><b>{lbl(m)}</b><button className="ic" onClick={() => setM(shift(m, 1))}>▶</button></div>
+    <div className="card hero"><div className="r2">Total fee Acut bulan ini</div><div className="hl">{rp(total)}</div></div>
+    <div className="card"><div className="dl">
+      <span>Sudah dibayar</span><span className="big ok">{rp(dibayar)}</span>
+      <span>Belum dibayar</span><span className="big cost">{rp(belum)}</span>
+      <span>Belum dibayar (semua bulan)</span><span className="big cost">{rp(belumSemua)}</span></div>
+      <p className="r2" style={{ margin: "8px 0 0" }}>Fee dianggap dibayar kalau panennya sudah ditandai lunas.</p></div>
+    <button className="wa" onClick={wa}>📤 Bagikan ke WhatsApp</button>
+    <div className="list">{!rows.length && <div className="empty">Belum ada panen bulan ini.</div>}
+      {rows.map((x) => (<div className={"row ro" + (x.lunas ? " lunas" : "")} key={x.id}>
+        <div><div className="r1"><span className="big">{tgl(x.tanggal)}</span></div><div className="r2"><b>{x.tipe}</b> · {kg(x.bersih)} · {x.persenFee}%</div></div>
+        <div style={{ textAlign: "right" }}><div className="big">{rp(x.fee)}</div><div className="r2">{x.lunas ? "✅ Dibayar" : "⚪ Belum"}</div></div></div>))}</div>
+  </>);
+}
+
+function Tren({ uid }) {
+  const pend = useCol(uid, "pendapatan").filter((x) => !x.dihapus);
+  const [n, setN] = useState(6);
+  const cur = today().slice(0, 7), sm = (mm) => BULAN[Number(mm.split("-")[1]) - 1].slice(0, 3) + " " + mm.slice(2, 4);
+  const data = Array.from({ length: n }, (_, i) => shift(cur, i - n + 1)).map((mm) => {
+    const r = pend.filter((x) => x.tanggal.startsWith(mm));
+    const f = (t) => { const a = r.filter((x) => x.tipe === t); const bersih = a.reduce((q, x) => q + N(x.bersih), 0), total = a.reduce((q, x) => q + N(x.total), 0); return { bersih, avg: bersih ? total / bersih : 0 }; };
+    return { mm, BB: f("BB"), BK: f("BK") };
+  });
+  const tot = (d) => d.BB.bersih + d.BK.bersih, max = Math.max(1, ...data.map(tot));
+  const best = data.reduce((a, d) => (tot(d) > tot(a) ? d : a), data[0]);
+  return (<>
+    <div className="radio" style={{ marginBottom: 10 }}>{[6, 12].map((k) => <button key={k} className={n === k ? "on" : ""} onClick={() => setN(k)}>{k} bulan</button>)}</div>
+    <div className="card"><h4>Berat bersih per bulan</h4>
+      <div className="r2" style={{ marginBottom: 6 }}><span className="dot bb" /> BB &nbsp; <span className="dot bk" /> BK</div>
+      {data.map((d) => <div className="b" key={d.mm}><span>{sm(d.mm)}</span>
+        <div className="stk"><i className="bb" style={{ width: (d.BB.bersih / max) * 100 + "%" }} /><i className="bk" style={{ width: (d.BK.bersih / max) * 100 + "%" }} /></div>
+        <span>{kg(tot(d))}</span></div>)}
+      {tot(best) > 0 && <p className="r2" style={{ margin: "8px 0 0" }}>Terbanyak: {lbl(best.mm)} ({kg(tot(best))})</p>}</div>
+    <div className="card"><h4>Harga rata-rata per kg</h4><div className="tbl">
+      <span className="r2">Bulan</span><span className="r2">BB</span><span className="r2">BK</span>
+      {data.map((d) => <><span className="big">{sm(d.mm)}</span><span>{d.BB.avg ? rp(d.BB.avg) : "-"}</span><span>{d.BK.avg ? rp(d.BK.avg) : "-"}</span></>)}</div></div>
   </>);
 }
