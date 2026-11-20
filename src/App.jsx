@@ -22,6 +22,7 @@ function MonthSelect({ items, value, onChange }) {
   return <select value={value} onChange={(e) => onChange(e.target.value)}><option value="">Semua bulan</option>{ms.map((m) => <option key={m} value={m}>{lbl(m)}</option>)}</select>;
 }
 const TABS = [["pendapatan", "🌴", "Panen"], ["biaya", "🧾", "Biaya"], ["rekap", "📊", "Rekap"], ["set", "⚙️", "Atur"]];
+const tgl = (t) => `${+t.slice(8)} ${BULAN[+t.slice(5, 7) - 1].slice(0, 3)} ${t.slice(2, 4)}`;
 const DEF = { angkut: 190, panen: 250, fee: 15 };
 
 // Semua hitungan pakai tarif yang tersimpan di transaksi; ongkos manual tidak ditimpa
@@ -49,7 +50,6 @@ export default function App() {
   if (user === undefined) return <div className="empty">Memuat…</div>;
   if (!user) return <Login />;
   return (<>
-    <header className="hd">🌴 Buku Kebun</header>
     <div className="wrap">
       {tab === "pendapatan" && <Pendapatan uid={user.uid} tarif={tarif} />}
       {tab === "biaya" && <Biaya uid={user.uid} />}
@@ -72,16 +72,11 @@ function Login() {
     {err && <div className="err">{err}</div>}<button onClick={go}>Masuk</button></div>);
 }
 
-function Menu({ onView, onEdit, onDel }) {
-  const [o, setO] = useState(false);
-  const pick = (f) => () => { setO(false); f(); };
-  return (<span style={{ position: "relative" }}>
-    <button className="ic" aria-label="Menu" onClick={() => setO(!o)}>⋮</button>
-    {o && <div className="dd">
-      <button onClick={pick(onView)}>👁️ Lihat</button>
-      <button onClick={pick(onEdit)}>✏️ Edit</button>
-      <button onClick={pick(onDel)}>🗑️ Hapus</button>
-    </div>}</span>);
+function Acts({ onView, onEdit, onDel, children }) {
+  return (<div className="acts">{children}
+    <button aria-label="Lihat" onClick={onView}>👁️</button>
+    <button aria-label="Edit" onClick={onEdit}>✏️</button>
+    <button aria-label="Hapus" className="rm" onClick={onDel}>🗑️</button></div>);
 }
 
 function Sheet({ children, close }) {
@@ -122,12 +117,12 @@ function Pendapatan({ uid, tarif }) {
       {list.map((x) => (<div className={"row" + (x.lunas ? " lunas" : "")} key={x.id}>
         <input type="checkbox" checked={s.sel.has(x.id)} onChange={() => s.toggle(x.id)} />
         <div onClick={() => setView(x)}>
-          <div className="r1"><span className="big">{x.tanggal} · {x.tipe}</span><span className="big">{rp(x.total)}</span></div>
-          <div className="r2">{kg(x.bersih)}{x.pembeli ? " · " + x.pembeli : ""}</div>
+          <div className="r1"><span className="big">{tgl(x.tanggal)}</span><span className="big">{rp(x.total)}</span></div>
+          <div className="r2"><b>{x.tipe}</b> · {kg(x.bersih)}{x.pembeli ? " · " + x.pembeli : ""}</div>
           <div className="r2">Untung bersih <b className="ok">{rp(x.untung)}</b></div></div>
-        <div className="right">
-          <button className="ic" aria-label="Tandai lunas" onClick={() => lunas(x)}>{x.lunas ? "✅" : "⚪"}</button>
-          <Menu onView={() => setView(x)} onEdit={() => setForm(x)} onDel={() => del(x)} /></div></div>))}
+        <Acts onView={() => setView(x)} onEdit={() => setForm(x)} onDel={() => del(x)}>
+          <button className="lun" aria-label="Tandai lunas" onClick={() => lunas(x)}>{x.lunas ? "✅" : "⚪"}</button></Acts>
+      </div>))}
     </div>
     <div className="sum"><div>
       <span>{s.n ? `${s.n} dipilih` : "Semua yang tampil"} ({s.rows.length} panen)</span><span>{kg(sum("kotor"))} kotor / {kg(sum("bersih"))} bersih</span>
@@ -208,9 +203,9 @@ function Biaya({ uid }) {
       {!list.length && <div className="empty">Belum ada biaya.</div>}
       {list.map((x) => (<div className="row bi" key={x.id}>
         <input type="checkbox" checked={s.sel.has(x.id)} onChange={() => s.toggle(x.id)} />
-        <div onClick={() => setView(x)}><div className="r1"><span className="big">{x.tanggal}</span><span className="big cost">{rp(x.nominal)}</span></div>
+        <div onClick={() => setView(x)}><div className="r1"><span className="big">{tgl(x.tanggal)}</span><span className="big cost">{rp(x.nominal)}</span></div>
           <div className="r2">{x.keterangan}</div></div>
-        <Menu onView={() => setView(x)} onEdit={() => setForm(x)} onDel={() => del(x)} />
+        <Acts onView={() => setView(x)} onEdit={() => setForm(x)} onDel={() => del(x)} />
       </div>))}</div>
     <div className="sum"><div><span>{s.n ? `${s.n} dipilih` : "Grand total"} ({s.rows.length} biaya)</span><span className="u cost">{rp(total)}</span></div></div>
     {form && <BForm init={form} uid={uid} close={() => setForm(null)} />}
