@@ -23,6 +23,20 @@ function MonthSelect({ items, value, onChange }) {
 }
 const TABS = [["pendapatan", "🌴", "Panen"], ["biaya", "🧾", "Biaya"], ["rekap", "📊", "Rekap"], ["set", "⚙️", "Atur"]];
 const tgl = (t) => `${+t.slice(8)} ${BULAN[+t.slice(5, 7) - 1].slice(0, 3)} ${t.slice(2, 4)}`;
+// Animasi 1 detik: koin $ hijau dan buah sawit oranye meletup dari titik ketukan
+function burst(x, y) {
+  if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const root = document.createElement("div"); root.className = "burst";
+  const ring = document.createElement("span"); ring.className = "ring"; ring.style.left = x + "px"; ring.style.top = y + "px"; root.appendChild(ring);
+  const n = 24;
+  for (let i = 0; i < n; i++) {
+    const p = document.createElement("span"), ang = (Math.PI * 2 * i) / n + Math.random() * 0.25, dist = 70 + Math.random() * 100;
+    p.className = i % 2 ? "bp fruit" : "bp usd"; if (i % 2 === 0) p.textContent = "$";
+    p.style.cssText = `left:${x}px;top:${y}px;--dx:${Math.cos(ang) * dist}px;--dy:${Math.sin(ang) * dist}px;--r:${(Math.random() - 0.5) * 540}deg;--s:${0.8 + Math.random() * 0.7}`;
+    root.appendChild(p);
+  }
+  document.body.appendChild(root); setTimeout(() => root.remove(), 1100);
+}
 const DEF = { angkut: 190, panen: 250, fee: 15 };
 
 // Semua hitungan pakai tarif yang tersimpan di transaksi; ongkos manual tidak ditimpa
@@ -106,7 +120,7 @@ function Pendapatan({ uid, tarif }) {
   const exp = () => saveFile(`pendapatan-${bln || "semua"}.csv`, pendCsv(list), "text/csv");
   const lunas = (x) => updateDoc(ref(x.id), { lunas: !x.lunas, tanggalLunas: x.lunas ? "" : today() });
   return (<>
-    <button className="add" onClick={() => setForm({})}>+ Panen Baru</button>
+    <button className="add" onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); burst(e.clientX || r.left + r.width / 2, e.clientY || r.top + r.height / 2); setTimeout(() => setForm({}), 300); }}>+ Panen Baru</button>
     <div className="bar"><input placeholder="Cari pembeli / tanggal" value={q} onChange={(e) => setQ(e.target.value)} /></div>
     <div className="bar"><MonthSelect items={items} value={bln} onChange={setBln} />
       <select value={st} onChange={(e) => setSt(e.target.value)}><option value="semua">Semua</option><option value="belum">Belum lunas</option><option value="lunas">Sudah lunas</option></select>

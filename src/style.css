@@ -48,3 +48,11 @@ button,input,select{font:inherit;color:inherit}
 .acts{display:grid;grid-template-columns:repeat(3,30px);gap:4px;align-self:center}
 .acts button{width:30px;height:30px;font-size:14px;border-radius:10px;border:1.5px solid var(--ln);background:#fff;padding:0}
 .acts .rm{border-color:#ffc4cb;background:#fff4f5}.acts .lun{grid-row:2;grid-column:1/-1;width:100%;font-size:23px;border:0;background:none}
+.burst{position:fixed;inset:0;pointer-events:none;z-index:100;overflow:hidden}
+.ring{position:absolute;width:20px;height:20px;margin:-10px 0 0 -10px;border-radius:50%;border:3px solid #9a6bff;animation:ring .55s ease-out forwards}
+@keyframes ring{from{transform:scale(.2);opacity:.9}to{transform:scale(7);opacity:0}}
+.bp{position:absolute;width:26px;height:26px;margin:-13px 0 0 -13px;border-radius:50%;display:grid;place-items:center;font-weight:900;font-size:16px;transform:scale(0);animation:bp 1s cubic-bezier(.15,.7,.3,1) forwards}
+.bp.usd{background:radial-gradient(circle at 30% 28%,#5df08c,#13994a);color:#fff;box-shadow:0 0 8px #1fa85499}
+.bp.fruit{width:16px;height:16px;margin:-8px 0 0 -8px;background:radial-gradient(circle at 35% 30%,#ffb870,#ea6a14 62%,#b94a08);box-shadow:0 0 6px #ea6a1480;position:absolute}
+.bp.fruit::after{content:"";position:absolute;width:5px;height:5px;border-radius:50%;background:#3a1a08;right:3px;bottom:3px}
+@keyframes bp{0%{transform:translate(0,0) scale(0) rotate(0);opacity:1}15%{transform:translate(calc(var(--dx)*.3),calc(var(--dy)*.3)) scale(var(--s)) rotate(calc(var(--r)*.2));opacity:1}60%{transform:translate(calc(var(--dx)*.9),calc(var(--dy)*.9 + 20px)) scale(var(--s)) rotate(calc(var(--r)*.7));opacity:1}100%{transform:translate(var(--dx),calc(var(--dy) + 70px)) scale(calc(var(--s)*.6)) rotate(var(--r));opacity:0}}
