@@ -49,7 +49,7 @@ export default function App() {
   if (user === undefined) return <div className="empty">Memuat…</div>;
   if (!user) return <Login />;
   return (<>
-    <header className="hd">Buku Kebun</header>
+    <header className="hd">🌴 Buku Kebun</header>
     <div className="wrap">
       {tab === "pendapatan" && <Pendapatan uid={user.uid} tarif={tarif} />}
       {tab === "biaya" && <Biaya uid={user.uid} />}
@@ -119,7 +119,7 @@ function Pendapatan({ uid, tarif }) {
     <label className="all"><input type="checkbox" checked={list.length > 0 && s.n === list.length} onChange={s.all} /> Pilih semua</label>
     <div className="list">
       {!list.length && <div className="empty">Belum ada data. Ketuk “+ Panen” untuk mulai.</div>}
-      {list.map((x) => (<div className="row" key={x.id}>
+      {list.map((x) => (<div className={"row" + (x.lunas ? " lunas" : "")} key={x.id}>
         <input type="checkbox" checked={s.sel.has(x.id)} onChange={() => s.toggle(x.id)} />
         <div onClick={() => setView(x)}>
           <div className="r1"><span className="big">{x.tanggal} · {x.tipe}</span><span className="big">{rp(x.total)}</span></div>
@@ -206,7 +206,7 @@ function Biaya({ uid }) {
     <label className="all"><input type="checkbox" checked={list.length > 0 && s.n === list.length} onChange={s.all} /> Pilih semua</label>
     <div className="list two">
       {!list.length && <div className="empty">Belum ada biaya.</div>}
-      {list.map((x) => (<div className="row" key={x.id}>
+      {list.map((x) => (<div className="row bi" key={x.id}>
         <input type="checkbox" checked={s.sel.has(x.id)} onChange={() => s.toggle(x.id)} />
         <div onClick={() => setView(x)}><div className="r1"><span className="big">{x.tanggal}</span><span className="big cost">{rp(x.nominal)}</span></div>
           <div className="r2">{x.keterangan}</div></div>
