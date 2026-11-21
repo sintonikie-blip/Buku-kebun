@@ -37,15 +37,14 @@ function burst(x, y) {
   }
   document.body.appendChild(root); setTimeout(() => root.remove(), 1100);
 }
-const DEF = { angkut: 190, panen: 250, fee: 15, minPanen: 6000 };
+const DEF = { angkut: 190, panen: 250, fee: 15, minAngkut: 6000 };
 
 // Semua hitungan pakai tarif yang tersimpan di transaksi; ongkos manual tidak ditimpa
 function calc(d) {
   const total = Math.round(N(d.bersih) * N(d.harga));
-  const angkut = d.angkutManual ? N(d.ongkosAngkut) : Math.round(N(d.kotor) * N(d.tarifAngkut));
-  // Ongkos panen = berat bersih x tarif. Kalau berat KOTOR di bawah minimum (mis. 6 ton), ditagih sebesar minimum x tarif
-  const dasar = N(d.minPanen) && N(d.kotor) < N(d.minPanen) ? N(d.minPanen) : N(d.bersih);
-  const panen = d.panenManual ? N(d.ongkosPanen) : Math.round(dasar * N(d.tarifPanen));
+  // Ongkos angkut = berat kotor x tarif, tapi berat kotor minimal 6 ton (minAngkut)
+  const angkut = d.angkutManual ? N(d.ongkosAngkut) : Math.round(Math.max(N(d.kotor), N(d.minAngkut)) * N(d.tarifAngkut));
+  const panen = d.panenManual ? N(d.ongkosPanen) : Math.round(N(d.bersih) * N(d.tarifPanen));
   const fee = Math.round((total - angkut - panen) * N(d.persenFee) / 100);
   return { total, ongkosAngkut: angkut, ongkosPanen: panen, fee, untung: total - angkut - panen - fee };
 }
@@ -155,8 +154,8 @@ function Pendapatan({ uid, tarif }) {
         <span>Pembeli</span><span>{view.pembeli || "-"}</span>
         <span>Berat kotor</span><span>{kg(view.kotor)}</span><span>Berat bersih</span><span>{kg(view.bersih)}</span>
         <span>Harga</span><span>{rp(view.harga)}/kg</span><span className="big">Total</span><b>{rp(view.total)}</b>
-        <span>Ongkos angkut ({view.angkutManual ? "manual" : `${kg(view.kotor)} × ${view.tarifAngkut}`})</span><span>− {rp(view.ongkosAngkut)}</span>
-        <span>Ongkos panen ({view.panenManual ? "manual" : N(view.minPanen) && N(view.kotor) < N(view.minPanen) ? `kotor di bawah ${kg(view.minPanen)}, min ${kg(view.minPanen)} × ${view.tarifPanen}` : `${kg(view.bersih)} × ${view.tarifPanen}`})</span><span>− {rp(view.ongkosPanen)}</span>
+        <span>Ongkos angkut ({view.angkutManual ? "manual" : N(view.minAngkut) > N(view.kotor) ? `min ${kg(view.minAngkut)} × ${view.tarifAngkut}` : `${kg(view.kotor)} × ${view.tarifAngkut}`})</span><span>− {rp(view.ongkosAngkut)}</span>
+        <span>Ongkos panen ({view.panenManual ? "manual" : `${kg(view.bersih)} × ${view.tarifPanen}`})</span><span>− {rp(view.ongkosPanen)}</span>
         <span>Fee Acut ({view.persenFee}%)</span><span>− {rp(view.fee)}</span>
         <span className="big">Untung bersih</span><b className="ok">{rp(view.untung)}</b>
         <span>Status</span><span>{view.lunas ? `✅ Lunas (${view.tanggalLunas})` : "Belum lunas"}</span>
@@ -170,8 +169,8 @@ function PForm({ init, tarif, uid, close, names }) {
   const baru = !init.id;
   const [d, setD] = useState({
     tanggal: today(), tipe: "BB", kotor: "", bersih: "", harga: "", pembeli: "",
-    tarifAngkut: tarif.angkut, tarifPanen: tarif.panen, persenFee: tarif.fee, minPanen: tarif.minPanen,
-    angkutManual: false, panenManual: false, ongkosAngkut: "", ongkosPanen: "", ...init, ...(init.id ? { minPanen: init.minPanen || 0 } : {}) });
+    tarifAngkut: tarif.angkut, tarifPanen: tarif.panen, persenFee: tarif.fee, minAngkut: tarif.minAngkut,
+    angkutManual: false, panenManual: false, ongkosAngkut: "", ongkosPanen: "", ...init, ...(init.id ? { minAngkut: init.minAngkut || 0 } : {}) });
   const set = (k, v) => setD((p) => ({ ...p, [k]: v }));
   const c = calc(d);
   const save = async () => {
@@ -193,8 +192,8 @@ function PForm({ init, tarif, uid, close, names }) {
     {num("harga", "Harga (Rp/kg)")}
     <label>Total<input readOnly value={rp(c.total)} /></label>
     <label className="full">Pembeli (opsional)<input list="pembeli-list" value={d.pembeli} onChange={(e) => set("pembeli", e.target.value)} /><datalist id="pembeli-list">{names.map((n) => <option key={n} value={n} />)}</datalist></label>
-    {ongkos("ongkosAngkut", "angkutManual", `Ongkos angkut (${d.tarifAngkut}/kg kotor)`)}
-    {ongkos("ongkosPanen", "panenManual", `Ongkos panen (${d.tarifPanen}/kg bersih${N(d.minPanen) ? ", min " + kg(d.minPanen) + " kotor" : ""})`)}
+    {ongkos("ongkosAngkut", "angkutManual", `Ongkos angkut (${d.tarifAngkut}/kg kotor${N(d.minAngkut) ? ", min " + kg(d.minAngkut) : ""})`)}
+    {ongkos("ongkosPanen", "panenManual", `Ongkos panen (${d.tarifPanen}/kg bersih)`)}
     <div className="prev"><span>Fee Acut ({d.persenFee}%)</span><span>{rp(c.fee)}</span>
       <b>Untung bersih</b><b className="ok">{rp(c.untung)}</b></div></div>
     <div className="btns"><button onClick={close}>Batal</button><button className="pri" onClick={save}>Simpan</button></div></Sheet>);
@@ -268,10 +267,10 @@ function Pengaturan({ uid, tarif }) {
     if (!lok.lat.trim() || !lok.lon.trim() || !isFinite(la) || !isFinite(lo) || Math.abs(la) > 90 || Math.abs(lo) > 180) return alert("Koordinat tidak valid.");
     await setDoc(doc(db, "users", uid, "settings", "lokasi"), { nama: lok.nama, lat: la, lon: lo }); alert("Lokasi kebun disimpan.");
   };
-  const save = async () => { await setDoc(doc(db, "users", uid, "settings", "tarif"), { angkut: N(t.angkut), panen: N(t.panen), fee: N(t.fee), minPanen: N(t.minPanen) }); alert("Tarif disimpan. Berlaku untuk panen baru."); };
+  const save = async () => { await setDoc(doc(db, "users", uid, "settings", "tarif"), { angkut: N(t.angkut), panen: N(t.panen), fee: N(t.fee), minAngkut: N(t.minAngkut) }); alert("Tarif disimpan. Berlaku untuk panen baru."); };
   const f = (k, l) => <label>{l}<input inputMode="decimal" value={t[k]} onChange={(e) => setT({ ...t, [k]: e.target.value })} /></label>;
   return (<><h3>Tarif</h3><div className="f">
-    {f("angkut", "Ongkos angkut (Rp/kg kotor)")}{f("panen", "Ongkos panen (Rp/kg bersih)")}{f("fee", "Fee Acut (%)")}{f("minPanen", "Minimum panen (kg berat kotor)")}</div>
+    {f("angkut", "Ongkos angkut (Rp/kg kotor)")}{f("panen", "Ongkos panen (Rp/kg bersih)")}{f("fee", "Fee Acut (%)")}{f("minAngkut", "Minimum berat kotor ongkos angkut (kg)")}</div>
     <p className="r2">Data panen lama tidak ikut berubah; tiap panen menyimpan tarifnya sendiri.</p>
     <div className="btns"><button className="pri" onClick={save}>Simpan tarif</button></div>
     <h3>Lokasi kebun (untuk cuaca)</h3><div className="card">
@@ -494,7 +493,7 @@ function Pulihkan({ uid }) {
       const ops = [];
       for (const [col, arr] of [["pendapatan", info.pendapatan], ["biayaLain", info.biayaLain], ["catatan", info.catatan]])
         for (const { id, ...data } of arr) ops.push([doc(db, "users", uid, col, id), data]);
-      if (info.tarif) ops.push([doc(db, "users", uid, "settings", "tarif"), { angkut: N(info.tarif.angkut), panen: N(info.tarif.panen), fee: N(info.tarif.fee), minPanen: N(info.tarif.minPanen ?? 6000) }]);
+      if (info.tarif) ops.push([doc(db, "users", uid, "settings", "tarif"), { angkut: N(info.tarif.angkut), panen: N(info.tarif.panen), fee: N(info.tarif.fee), minAngkut: N(info.tarif.minAngkut ?? 6000) }]);
       for (let i = 0; i < ops.length; i += 400) { const b = writeBatch(db); ops.slice(i, i + 400).forEach(([r, d]) => b.set(r, d)); await b.commit(); }
       alert("Selesai. Data cadangan sudah dikembalikan."); setInfo(null);
     } catch (e) { alert("Gagal memulihkan: " + e.message); }
