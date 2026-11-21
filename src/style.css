@@ -72,3 +72,4 @@ button,input,select{font:inherit;color:inherit}
 .hasil{display:block;width:100%;text-align:left;background:#fff;border:1.5px solid var(--ln);border-radius:10px;padding:9px 12px;margin-bottom:6px;font-weight:700}
 .fc .one{display:flex;justify-content:space-between;align-items:center;gap:8px;font-weight:800;font-size:13px}.fc .oneT{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
 .fc:has(.one){padding:8px 12px}
+.fc .chip{flex:none;background:#d6e6ff;color:#1c3d7a;border-radius:999px;padding:2px 9px;font-size:12px;font-weight:800;margin-left:auto}

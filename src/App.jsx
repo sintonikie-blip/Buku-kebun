@@ -536,7 +536,7 @@ function Perkiraan({ uid, items }) {
   }, [la, lo]);
   const act = items.filter((x) => !x.dihapus), tg = [...new Set(act.map((x) => x.tanggal))].sort();
   let l1, l1b = "", info = "", s1 = "";
-  if (tg.length < 4) { l1 = "🔮 Perkiraan panen: data belum cukup (minimal 4 panen)"; s1 = "🔮 Data belum cukup"; }
+  if (tg.length < 4) { l1 = "🔮 Perkiraan panen: data belum cukup (minimal 4 panen)"; s1 = "🔮 Perkiraan panen: data belum cukup"; }
   else {
     const dts = tg.slice(-7), gaps = dts.slice(1).map((d, i) => dn(d) - dn(dts[i])).sort((a, b) => a - b), n = gaps.length;
     const med = (gaps[(n - 1) >> 1] + gaps[n >> 1]) / 2, last = tg[tg.length - 1], ago = dn(today()) - dn(last);
@@ -545,17 +545,20 @@ function Perkiraan({ uid, items }) {
     const from = addD(last, gaps[0]), to = addD(last, gaps[n - 1]);
     info = `Panen terakhir ${dm(last)} (${ago} hari lalu). Jarak antar panen biasanya ${gaps[0]}–${gaps[n - 1]} hari, tengahnya ${med} hari.`;
     l1 = dn(to) < dn(today()) ? `🔮 Sudah ${ago} hari sejak panen terakhir, lewat dari kebiasaan (tiap ~${Math.round(med)} hari)` : `🔮 Panen berikutnya sekitar ${rentang(from, to)}`;
-    s1 = dn(to) < dn(today()) ? `🔮 Sudah ${ago} hari sejak panen` : `🔮 Panen ${rentang(from, to)}`;
+    const df = dn(from) - dn(today()), dt = dn(to) - dn(today());
+    s1 = dt < 0 ? `🔮 Sudah ${ago} hari sejak panen terakhir` : df <= 0 ? `🔮 Waktunya panen (s/d ${dm(to)})` : `🔮 Panen ${df === 1 ? "besok" : df + " hari lagi"} (${rentang(from, to)})`;
     const nf = (v) => r10(v).toLocaleString("id-ID");
     l1b = `≈ ${kg(r10(avg))} (${nf(Math.min(...ws))}–${nf(Math.max(...ws))} kg)`;
   }
-  let w = "🌦️ Atur lokasi kebun di menu Atur untuk melihat cuaca", s2 = "🌦️ Atur lokasi", days = [];
+  let w = "🌦️ Atur lokasi kebun di menu Atur untuk melihat cuaca", s2 = "🌦️ Atur lokasi", days = [], chip = "";
   if (lok && cw === "gagal") { w = "🌦️ Cuaca tidak tersedia (periksa internet)"; s2 = "🌦️ Cuaca off"; }
   else if (lok && cw) {
     const d = cw.daily; days = d.time.map((t, i) => ({ t, c: d.weathercode[i], mm: d.precipitation_sum[i], p: d.precipitation_probability_max[i], rain: (d.precipitation_probability_max[i] || 0) >= 60 || (d.precipitation_sum[i] || 0) >= 5 }));
     const rn = days.filter((x) => x.rain), lst = rn.map((x) => `${HARI[new Date(x.t + "T00:00").getDay()]} ${+x.t.slice(8)}`).join(", ");
     w = (rn.length ? `🌧️ Hujan: ${lst}` : "☀️ Tidak ada hujan berarti 7 hari ke depan") + (cw.lama ? " (data lama)" : "");
     s2 = rn.length ? `🌧️ ${lst}` : "☀️ Kering";
+    const soon = rn.filter((x) => dn(x.t) >= dn(today()) && dn(x.t) - dn(today()) <= 1);
+    if (soon.length) chip = soon.some((x) => dn(x.t) === dn(today())) ? "🌧️ hari ini" : "🌧️ besok";
   } else if (lok) { w = "🌦️ Memuat cuaca…"; s2 = "🌦️ …"; }
   return (<div className="fc" onClick={toggle}>
     {open ? <>
@@ -564,6 +567,6 @@ function Perkiraan({ uid, items }) {
       {days.length > 0 && <div className="fcgrid">{days.map((x) => <div key={x.t} className={x.rain ? "rainy" : ""}><div>{HARI[new Date(x.t + "T00:00").getDay()]} {+x.t.slice(8)}</div><div className="ic2">{wi(x.c)}</div><div>{x.p == null ? "-" : x.p + "%"}</div><div>{Math.round(x.mm || 0)} mm</div></div>)}</div>}
       <div className="l2" style={{ marginTop: 6 }}>Hanya perkiraan dari data panenmu dan prakiraan cuaca, bukan jaminan.</div>
       <div className="r2" style={{ textAlign: "center", fontSize: 11 }}>▲ tutup</div></>
-    : <div className="one"><span className="oneT">{s1} · {s2}</span><span>▼</span></div>}
+    : <div className="one"><span className="oneT">{s1}</span>{chip && <span className="chip">{chip}</span>}<span>▼</span></div>}
   </div>);
 }
